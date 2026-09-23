@@ -1,0 +1,46 @@
+{
+  "name": "defcon-explorer",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "description": "DeFCoN Blockchain Explorer",
+  "workspaces": [
+    "shared",
+    "server",
+    "client",
+    "mcp"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
+    "start": "node server/dist/index.js",
+    "lint": "eslint .",
+    "test": "npm run test -w server",
+    "test:ci": "npm run test:ci -w server",
+    "perf:api": "node scripts/perf/api-benchmark.mjs",
+    "perf:ws": "node scripts/perf/ws-benchmark.mjs",
+    "ops:validate": "node scripts/validate-operations.mjs",
+    "ops:preflight": "bash scripts/ops/preflight.sh",
+    "ops:deploy": "bash scripts/ops/deploy.sh",
+    "ops:backup": "bash scripts/ops/backup.sh",
+    "ops:restore": "bash scripts/ops/restore.sh"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.0"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/parser": "^8.56.0",
+    "eslint": "^10.0.1",
+    "ws": "^8.21.3"
+  },
+  "overrides": {
+    "minimatch": "^10.2.2",
+    "shell-quote": "1.10.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/defcon-project/explorer.git"
+  }
+}

@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /search
+Disallow: /searchv2
+Disallow: /test
+
+Sitemap: https://deftrack.xyz/sitemap.xml
+
+# AI-readable context
+# https://deftrack.xyz/llms.txt
+# https://deftrack.xyz/llms-full.txt
+# https://deftrack.xyz/.well-known/deftrack-ai.json

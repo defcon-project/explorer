@@ -1,0 +1,26 @@
+{
+  "name": "deftrack-mcp",
+  "version": "1.1.0",
+  "license": "MIT",
+  "private": true,
+  "description": "Read-only MCP server (stdio) for the DefTrack DeFCoN blockchain explorer public API",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "node --experimental-strip-types src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/defcon-project/explorer.git",
+    "directory": "mcp"
+  }
+}

@@ -1,0 +1,50 @@
+# Reference systemd unit for the local DeFCoN Core daemon (defcond) that the
+# explorer reads over RPC. Install as /etc/systemd/system/defcond.service and
+# adjust the binary and data paths to your installation.
+#
+# Runs as a dedicated "defcon" system account (no sudo, no login shell).
+# Config: /etc/defcon/defcon.conf (owner root:defcon, mode 0640).
+# Data:   /var/lib/defcon (created and owned by systemd via StateDirectory).
+#
+# defcon.conf settings the explorer relies on:
+#   server=1
+#   txindex=1               # getrawtransaction by txid alone
+#   rpcbind=127.0.0.1
+#   rpcallowip=127.0.0.1
+#   rpcport=8193            # RPC_PORT in the explorer .env
+#   rpcuser=<user>          # RPC_USER
+#   plus a strong random RPC password (rpcpassword), the same value as RPC_PASS
+#
+# TimeoutStopSec gives the daemon time for a clean shutdown. An unclean stop
+# can corrupt the block and evo databases, and the daemon then has to be
+# restarted with -reindex.
+
+[Unit]
+Description=DeFCoN Core daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=defcon
+Group=defcon
+RuntimeDirectory=defcond
+RuntimeDirectoryMode=0710
+StateDirectory=defcon
+StateDirectoryMode=0710
+PIDFile=/run/defcond/defcond.pid
+ExecStart=/usr/local/bin/defcond -daemon -pid=/run/defcond/defcond.pid -conf=/etc/defcon/defcon.conf -datadir=/var/lib/defcon
+ExecStop=/usr/local/bin/defcon-cli -conf=/etc/defcon/defcon.conf -datadir=/var/lib/defcon stop
+TimeoutStartSec=120
+TimeoutStopSec=600
+Restart=on-failure
+RestartSec=30
+
+# Sandboxing
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

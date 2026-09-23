@@ -1,0 +1,7 @@
+# Default: let Git detect and normalize text files
+* text=auto
+
+# Always LF for files executed on Linux servers and in CI
+*.sh text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

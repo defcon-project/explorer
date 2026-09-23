@@ -1,0 +1,192 @@
+:root {
+  color-scheme: dark;
+
+  /* Shared visual scale. Theme files own colour; these keep layout and motion consistent. */
+  --font-sans: 'Space Grotesk', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 0.875rem;
+  --radius-pill: 999px;
+
+  --duration-fast: 120ms;
+  --duration-normal: 180ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+:root[data-theme='dark'] {
+  --bg: #07111f;
+  --bg-soft: #0b1626;
+  --surface: #101c2b;
+  --surface-elevated: #142236;
+  --surface-muted: #0d1828;
+
+  --border: #26364a;
+  --border-soft: #1b2a3d;
+
+  --text: #f4f7fb;
+  --text-muted: #a7b3c4;
+  --text-subtle: #6f7f94;
+
+  --accent: #4f8cff;
+  --accent-hover: #6ea2ff;
+  --accent-soft: rgba(79, 140, 255, 0.12);
+  --accent-contrast: #ffffff;
+
+  --success: #42d392;
+  --success-soft: rgba(66, 211, 146, 0.12);
+
+  --warning: #f5b84b;
+  --danger: #ef6461;
+  --info: #58bde6;
+
+  --focus-ring: #8db6ff;
+  --chart-series-1: #5e97ff;
+  --chart-series-2: #42d392;
+  --chart-series-3: #f5b84b;
+  --chart-series-4: #c28bff;
+  --chart-series-5: #58bde6;
+  --chart-series-6: #ef7a76;
+
+  --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f4ebdd;
+  --bg-soft: #efe2cf;
+  --surface: #fff8ee;
+  --surface-elevated: #faf0e3;
+  --surface-muted: #f1e3d1;
+
+  --border: #d9c3a8;
+  --border-soft: #e7d6c1;
+
+  --text: #2b160a;
+  --text-muted: #6f4e37;
+  --text-subtle: #9a7b61;
+
+  --accent: #a86a32;
+  --accent-hover: #8a4f22;
+  --accent-soft: rgba(168, 106, 50, 0.12);
+  --accent-contrast: #ffffff;
+
+  --success: #5d8a55;
+  --success-soft: rgba(93, 138, 85, 0.12);
+
+  --warning: #c2852f;
+  --danger: #b94a3a;
+  --info: #8f6a50;
+
+  --focus-ring: #8a4f22;
+  --chart-series-1: #2f67bb;
+  --chart-series-2: #397841;
+  --chart-series-3: #a56714;
+  --chart-series-4: #7854b8;
+  --chart-series-5: #227896;
+  --chart-series-6: #b94a3a;
+
+  --card-shadow: 0 12px 32px rgba(72, 45, 24, 0.08);
+}
+
+/* Legacy aliases used across existing pages/components */
+:root[data-theme='dark'],
+:root[data-theme='light'] {
+  --bg-primary: var(--bg);
+  --bg-secondary: var(--bg-soft);
+  --bg-tertiary: var(--surface-muted);
+  --bg-card: var(--surface);
+  --bg-card-hover: var(--surface-elevated);
+  --bg-header: var(--bg-soft);
+  --bg-input: var(--surface-muted);
+  --bg-badge: var(--surface-muted);
+
+  --text-primary: var(--text);
+  --text-secondary: var(--text-muted);
+  --text-color: var(--text);
+  --text-color-muted: var(--text-subtle);
+  --text-inverse: #ffffff;
+
+  --accent-primary: var(--accent);
+  --accent-secondary: var(--accent-hover);
+  --accent-tertiary: var(--accent-hover);
+  --accent-light: var(--accent-soft);
+  --accent-glow: var(--accent-soft);
+
+  --border-color: var(--border);
+  --border-light: var(--border-soft);
+  --divider: var(--border-soft);
+  --color-border: var(--border);
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.1);
+  --shadow-md: 0 10px 24px rgba(15, 23, 42, 0.14);
+  --shadow-lg: 0 14px 34px rgba(15, 23, 42, 0.18);
+  --shadow-card: var(--card-shadow);
+
+  --error: var(--danger);
+  --success-color: var(--success);
+  --warning-color: var(--warning);
+  --error-color: var(--danger);
+
+  --success-bg: var(--success-soft);
+  --warning-bg: color-mix(in oklab, var(--warning) 15%, transparent);
+  --error-bg: color-mix(in oklab, var(--danger) 14%, transparent);
+  --info-bg: color-mix(in oklab, var(--info) 14%, transparent);
+
+  --success-rgb: 66, 211, 146;
+  --warning-rgb: 245, 184, 75;
+  --error-rgb: 239, 100, 97;
+  --info-rgb: 88, 189, 230;
+
+  --status-enabled: var(--success);
+  --status-enabled-bg: var(--success-soft);
+  --status-banned: var(--danger);
+  --status-banned-bg: color-mix(in oklab, var(--danger) 16%, transparent);
+  --status-poseban: var(--warning);
+  --status-poseban-bg: color-mix(in oklab, var(--warning) 16%, transparent);
+  --status-new: var(--info);
+  --status-new-bg: color-mix(in oklab, var(--info) 16%, transparent);
+  --status-removed: var(--text-subtle);
+  --status-removed-bg: color-mix(in oklab, var(--text-subtle) 18%, transparent);
+
+  --severity-low: var(--success);
+  --severity-medium: var(--warning);
+  --severity-high: var(--danger);
+  --severity-critical: #9b1b22;
+
+  --chart-line: var(--accent);
+  --chart-area: color-mix(in oklab, var(--accent) 22%, transparent);
+  --chart-grid: var(--border);
+  --chart-gradient-start: color-mix(in oklab, var(--accent) 34%, transparent);
+  --chart-gradient-end: color-mix(in oklab, var(--accent) 4%, transparent);
+
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+  --gradient-hero: linear-gradient(180deg, var(--surface-elevated) 0%, var(--surface) 100%);
+
+  --control-bg: var(--surface-muted);
+  --control-bg-hover: var(--surface-elevated);
+  --control-border: var(--border);
+  --focus-outline: 2px solid var(--focus-ring);
+
+  --scrollbar-track: var(--surface-muted);
+  --scrollbar-thumb: color-mix(in oklab, var(--border) 74%, var(--accent) 26%);
+}
+
+:root[data-theme='light'] {
+  --success-rgb: 93, 138, 85;
+  --warning-rgb: 194, 133, 47;
+  --error-rgb: 185, 74, 58;
+  --info-rgb: 143, 106, 80;
+}

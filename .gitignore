@@ -1,0 +1,55 @@
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+coverage/
+client/test-results/
+client/playwright-report/
+.vscode/
+!.vscode/extensions.json
+*.tsbuildinfo
+artifacts/perf/
+backups/
+*.bak
+*.bak.*
+*.bak-*
+
+# report preview artifacts
+**/.preview-report.png
+
+# Local tool settings and working notes
+.claude/settings.local.json
+CLAUDE.local.md
+HANDOFF.md
+nextstep.md
+
+# Local-only working directories at the repository root
+/artifacts/
+/configs/
+/core/
+
+# Keys and certificates
+*.pem
+*.key
+*_rsa
+*_rsa.*
+*_rsa_*
+id_rsa*
+id_ed25519*
+*credentials*
+
+# Database dumps
+*.bson
+*.archive
+mongodump/
+/dump/
+
+# Scratch files and archives
+tmp-*
+*.zip
+*.tar.gz

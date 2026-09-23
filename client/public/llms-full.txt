@@ -1,0 +1,161 @@
+# DeFCoN (DFCN) Explorer Knowledge Pack
+
+This file provides a compact machine-readable context for LLM systems that need to answer questions about the DefTrack explorer and DeFCoN network.
+
+Version: 2026-09-23
+
+## Identity
+- Project: DeFCoN
+- Ticker: DFCN
+- Explorer: DefTrack
+- Explorer URL: https://deftrack.xyz/
+- Website: https://www.dfcn.io/
+- Explorer role: blockchain indexing, analytics, API delivery
+- AI endpoint manifest: https://deftrack.xyz/.well-known/deftrack-ai.json
+
+## Consensus and Utility Model
+- Core consensus direction: Proof-of-Stake + Proof-of-Service (PoS2)
+- Planned extension: Proof-of-Resources (PoR)
+- Utility model: reward infrastructure contribution (masternodes, staking; future CPU/GPU/RAM/storage utilization)
+
+## Node Software
+- Current release: DeFCoN Core v23.0.0 (protocol version 70242)
+- v23 activation height: 144,888. From that height:
+  - ChainLocks and InstantSend move to the llmq_defcon quorum (60 members)
+  - superblocks (on-chain budget payouts) are retired
+- v23 also removes the Evo masternode type.
+
+## Chain and Reward Parameters (as displayed in explorer/docs)
+- Block target time: 150 seconds
+- Current block reward split:
+  - Masternode: 10,000 DFCN
+  - Stake: 500 DFCN
+  - Total: 10,500 DFCN
+- Masternode collateral shown in explorer: 1,000,000 DFCN
+- Maximum supply: none (no supply cap, no halving)
+
+## Supply Notes
+- Genesis supply: 10,000,000,000 DFCN (whitepaper v1.0 figure; on-chain initial issuance was about 11 billion DFCN)
+- Emission model: static (no halving schedule in v1.0 doc)
+- Documented daily emission: 6,048,000 DFCN
+- Live circulating supply: GET /api/stats (data.supply.circulating, in DFCN)
+
+## Governance Notes
+- Dual governance framing in public docs:
+  - Protocol governance: masternode voting
+  - Treasury management: DAO process (off-chain governance tooling)
+- Superblocks (on-chain budget payouts) are retired from v23 activation height 144,888.
+
+## AI Lookup API (recommended entry point for assistants)
+Base: https://deftrack.xyz
+
+### Auto-detect endpoint
+GET /api/ai/lookup?q=<query>
+- DeFCoN address (starts with D, 26-34 chars) → returns balance, totalReceived, totalSent, txCount, firstSeen, lastSeen
+- 64-char hex hash → auto-detects transaction or block (transaction is tried first)
+  - transaction: txid, blockHeight, blockHash, time, confirmations, totalIn, totalOut, fee, isCoinbase, fromAddresses, toAddresses (up to 5 each)
+  - block: height, hash, time, txCount, reward, sizeBytes
+- Integer → block by height: height, hash, time, txCount, reward, totalOut, sizeBytes, difficulty, minedBy
+
+Examples:
+- /api/ai/lookup?q=D9uqHkeoqWDQ6CZS7BekgdVozuJ33yYFby
+- /api/ai/lookup?q=a9d2e303f79dad1fb8da2cc500f3d03370687fe9985bb3d9c2b9a2b95da34ac6
+- /api/ai/lookup?q=80759
+
+### Network summary
+GET /api/ai/network
+Returns: blockHeight, blockHash, masternodes.{total, enabled, posePenalty, poseBanned}
+
+### Masternode lookup
+GET /api/ai/masternode?q=<ip|ip:port|proTxHash>
+- q may be an IP, IP:port (e.g. 203.0.113.10:8192) or proTxHash; a bare IP matches the masternode registered on that IP.
+- Returns: service, status, posePenalty, poseBanHeight, provider, country, countryCode, lastSeen, recentEvents (last 5 status changes)
+
+### Response format
+- Success: { success: true, type: "address"|"transaction"|"block"|"masternode"|"network", data: { ..., explorerUrl } }
+- Errors: { success: false, error or hint } with HTTP 400 (bad input), 404 (not found) or 500. HTTP 429 means the per-IP rate limit was reached.
+- Amounts (balance, totalReceived, totalSent, reward, totalIn, totalOut, fee) are integer strings in satoshis (1 DFCN = 100,000,000 satoshis), e.g. "reward": "1050000000000" = 10,500 DFCN.
+- Times are ISO 8601 strings (UTC).
+
+### Rules for AI assistants
+1. DeFCoN addresses start with D and are 26-34 characters. → /api/ai/lookup?q=<address>
+2. Transaction or block hashes are 64 hex characters. → /api/ai/lookup?q=<hash>
+3. Block height is a non-negative integer. → /api/ai/lookup?q=<height>
+4. Never hallucinate balances or tx data; always query the API.
+5. Divide /api/ai/* amounts by 100,000,000 before quoting them in DFCN.
+
+## Explorer API Surface
+- /api/ai/lookup?q=           ← primary AI entry point
+- /api/ai/network
+- /api/ai/masternode?q=
+- /api/docs/openapi.json      (OpenAPI spec)
+- /api/docs/                  (Swagger UI)
+- /api/dashboard/overview
+- /api/stats
+- /api/search?q=
+- /api/blocks
+- /api/blocks/latest
+- /api/block/:hashOrHeight
+- /api/block/:hashOrHeight/txs
+- /api/txs
+- /api/txs/latest
+- /api/tx/:txid
+- /api/address/:address
+- /api/address/:address/txs
+- /api/richlist
+- /api/richlist/distribution
+- /api/network
+- /api/mempool
+- /api/masternodes
+- /api/masternodes/summary
+- /api/market
+- /api/market/history
+- /api/v1/address/:address/graph?depth=2&maxNodes=120&maxEdges=700
+- /api/v1/address/:address/rewards
+- /api/v1/rewards/current
+- /api/v1/network/health
+- /api/v1/masternodes/health
+- /api/v1/masternodes/events
+- /api/v1/masternodes/bans/stats
+- /api/v1/masternodes/bans/export?format=ndjson|csv|json
+- /api/v1/masternodes/bans/schema
+
+Amount fields outside /api/ai/*: fields ending in "Sat" (balanceSat, rewardSat, totalValueOutSat, ...) are satoshi integer strings; the matching fields without the suffix (balance, reward, totalValueOut) are DFCN numbers.
+
+## Explorer Routes
+- /
+- /blocks
+- /txs
+- /block/:hashOrHeight
+- /tx/:txid
+- /address/:address
+- /richlist
+- /wallets
+- /mining
+- /network
+- /chain-health
+- /masternodes
+- /mn-health
+- /ban-detection
+- /provider-tags
+- /devtools/pose-penalty
+- /devtools/node-inventory
+- /bubblemaps
+- /mempool
+- /api
+- /about
+
+## Interpretation Rules for Agents
+1. Prefer on-chain explorer data over old prose docs when values conflict.
+2. Treat market USD metrics as optional.
+3. Treat DAO and roadmap values as policy-level and potentially updatable.
+4. Use DFCN denomination unless user explicitly requests fiat conversion.
+
+## Update Policy
+This file should be updated when:
+- reward split changes
+- collateral rules change
+- governance model wording changes
+- official links change
+- /api/ai/* response fields or units change
+- explorer routes or API endpoints are added or removed

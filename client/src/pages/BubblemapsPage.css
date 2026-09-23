@@ -1,0 +1,313 @@
+.bubblemaps-toolbar {
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.bubblemaps-input-wrap {
+  flex: 1;
+  min-width: 280px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.62rem 0.78rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-input);
+}
+
+.bubblemaps-input-wrap svg {
+  color: var(--text-muted);
+}
+
+.bubblemaps-input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.84rem;
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.bubblemaps-controls {
+  display: inline-flex;
+  align-items: end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.bubblemaps-select-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.bubblemaps-select {
+  min-width: 86px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.42rem 0.54rem;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.bubblemaps-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 1rem;
+}
+
+.bubblemaps-graph-card {
+  padding-bottom: 0.9rem;
+}
+
+.bubblemaps-card-header {
+  align-items: center;
+}
+
+.bubblemaps-meta {
+  display: inline-flex;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.bubblemaps-meta span {
+  padding: 0.24rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+}
+
+.bubblemaps-graph-wrap {
+  height: min(70vh, 760px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% -10%, rgba(53, 129, 255, 0.18) 0%, transparent 45%),
+    radial-gradient(circle at 90% 112%, rgba(255, 66, 202, 0.13) 0%, transparent 48%),
+    var(--bg-secondary);
+}
+
+.bubblemaps-empty {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+}
+
+.bubblemaps-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 70vh;
+}
+
+.bubblemaps-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+}
+
+.bubblemaps-list-item {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border-light);
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 0.56rem;
+  text-align: left;
+  padding: 0.55rem 0.6rem;
+  cursor: pointer;
+}
+
+.bubblemaps-list-item:last-child {
+  border-bottom: none;
+}
+
+.bubblemaps-list-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.bubblemaps-list-item.active {
+  background: var(--accent-light);
+}
+
+.bubblemaps-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(9, 26, 45, 0.7);
+}
+
+.bubblemaps-list-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.bubblemaps-list-address {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.bubblemaps-list-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.bubblemaps-selected {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  padding: 0.75rem;
+}
+
+.bubblemaps-selected h3,
+.bubblemaps-transfers h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.86rem;
+  color: var(--text-primary);
+}
+
+.bubblemaps-selected-address {
+  font-size: 0.73rem;
+  word-break: break-all;
+  color: var(--text-secondary);
+}
+
+.bubblemaps-selected-stats {
+  margin-top: 0.65rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.bubblemaps-selected-stats div {
+  padding: 0.4rem 0.48rem;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.bubblemaps-selected-stats span {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.bubblemaps-selected-stats strong {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.79rem;
+  color: var(--text-primary);
+}
+
+.bubblemaps-selected-links {
+  margin-top: 0.65rem;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.bubblemaps-selected-links a {
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 0.26rem 0.62rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+}
+
+.bubblemaps-selected-links a:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.bubblemaps-transfers {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  padding: 0.75rem;
+  min-height: 180px;
+}
+
+.bubblemaps-transfer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.bubblemaps-transfer-item {
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-card);
+  padding: 0.5rem 0.55rem;
+}
+
+.bubblemaps-transfer-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.25rem;
+}
+
+.bubblemaps-transfer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 1180px) {
+  .bubblemaps-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bubblemaps-sidebar {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .bubblemaps-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bubblemaps-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .bubblemaps-graph-wrap {
+    height: 60vh;
+  }
+
+  .bubblemaps-selected-stats {
+    grid-template-columns: 1fr;
+  }
+}

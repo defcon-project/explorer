@@ -1,0 +1,127 @@
+.mempool-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: clamp(1.1rem, 2.4vw, 1.8rem);
+  margin-bottom: 1.25rem;
+  background:
+    radial-gradient(circle at 12% -10%, rgba(var(--info-rgb), 0.22), transparent 42%),
+    radial-gradient(circle at 92% 130%, rgba(var(--warning-rgb), 0.15), transparent 48%),
+    var(--gradient-hero);
+  border: 1px solid var(--border-color);
+}
+
+[data-theme='light'] .mempool-hero {
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.mempool-hero-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.25rem, 2.6vw, 1.7rem);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+[data-theme='dark'] .mempool-hero-title {
+  color: #ffffff;
+}
+
+.mempool-hero-subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+[data-theme='dark'] .mempool-hero-subtitle {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.mempool-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.mempool-stat {
+  position: relative;
+  padding: 0.95rem 1.05rem;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.mempool-stat::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--mp-accent, var(--accent-primary));
+}
+
+.mempool-stat--queue { --mp-accent: var(--info); }
+.mempool-stat--size  { --mp-accent: var(--accent-primary); }
+.mempool-stat--time  { --mp-accent: var(--warning); }
+
+.mempool-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.mempool-stat-label svg {
+  color: var(--mp-accent, var(--accent-primary));
+}
+
+.mempool-stat-value {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.mempool-empty,
+.mempool-loading,
+.mempool-error {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.mempool-error {
+  color: var(--status-banned);
+}
+
+/* Minimal UI overrides */
+.mempool-hero,
+.mempool-stat {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.mempool-hero-title,
+[data-theme='dark'] .mempool-hero-title {
+  color: var(--text-primary);
+}
+
+.mempool-hero-subtitle,
+[data-theme='dark'] .mempool-hero-subtitle {
+  color: var(--text-muted);
+}
+
+.mempool-stat::before {
+  width: 3px;
+}

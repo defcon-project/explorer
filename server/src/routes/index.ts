@@ -1,0 +1,47 @@
+import { Router } from 'express';
+import { requireAdminApiKey } from '../middleware/requireAdminApiKey';
+import healthRoutes from './health.routes';
+import blocksRoutes from './blocks.routes';
+import transactionsRoutes from './transactions.routes';
+import addressesRoutes from './addresses.routes';
+import richlistRoutes from './richlist.routes';
+import statsRoutes from './stats.routes';
+import searchRoutes from './search.routes';
+import syncRoutes from './sync.routes';
+import networkRoutes from './network.routes';
+import mempoolRoutes from './mempool.routes';
+import marketRoutes from './market.routes';
+import coinRoutes from './coin.routes';
+import masternodesRoutes from './masternodes.routes';
+import dashboardRoutes from './dashboard.routes';
+import docsRoutes from './docs.routes';
+import v1Routes from './v1';
+import adminRoutes from './admin.routes';
+import migrationRoutes from './migration.routes';
+import aiRoutes from './ai.routes';
+
+const router = Router();
+
+router.use('/health', healthRoutes);
+router.use('/blocks', blocksRoutes);
+router.use('/block', blocksRoutes);
+router.use('/txs', transactionsRoutes);
+router.use('/tx', transactionsRoutes);
+router.use('/address', addressesRoutes);
+router.use('/richlist', richlistRoutes);
+router.use('/stats', statsRoutes);
+router.use('/search', searchRoutes);
+router.use('/sync', syncRoutes);
+router.use('/network', networkRoutes);
+router.use('/mempool', mempoolRoutes);
+router.use('/market', marketRoutes);
+router.use('/coin', coinRoutes);
+router.use('/masternodes', masternodesRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/migration', migrationRoutes);
+router.use('/docs', docsRoutes);
+router.use('/v1', v1Routes);
+router.use('/admin', requireAdminApiKey, adminRoutes);
+router.use('/ai', aiRoutes);
+
+export default router;

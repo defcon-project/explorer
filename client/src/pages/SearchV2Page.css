@@ -1,0 +1,380 @@
+.searchv2-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.searchv2-query-card {
+  padding: 1.05rem 1.1rem;
+}
+
+.searchv2-query-form {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.searchv2-query-input {
+  flex: 1;
+  max-width: none;
+}
+
+.searchv2-query-help {
+  margin-top: 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.searchv2-state-card {
+  min-height: 170px;
+}
+
+.searchv2-state-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.searchv2-summary-strip {
+  padding: 0;
+  overflow: hidden;
+}
+
+.searchv2-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.searchv2-summary-item {
+  padding: 1rem 1.05rem;
+  border-right: 1px solid var(--border-light);
+}
+
+.searchv2-summary-item:last-child {
+  border-right: none;
+}
+
+.searchv2-summary-label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.searchv2-summary-value {
+  margin-top: 0.32rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-primary);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: clamp(0.88rem, 1.6vw, 1.2rem);
+}
+
+.searchv2-summary-value svg {
+  color: var(--accent-primary);
+}
+
+.searchv2-summary-subtle {
+  margin-top: 0.2rem;
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.searchv2-flow-listing {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.searchv2-flow-card {
+  padding: 1rem 1rem 0.88rem;
+}
+
+.searchv2-flow-header {
+  display: grid;
+  gap: 0.48rem;
+  margin-bottom: 0.8rem;
+}
+
+.searchv2-flow-hashline {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.searchv2-flow-hashline svg {
+  font-size: 1rem;
+  color: var(--accent-primary);
+}
+
+.searchv2-flow-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem 0.82rem;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.searchv2-flow-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.searchv2-flow-meta-item svg {
+  color: var(--accent-primary);
+}
+
+.searchv2-flow-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.85rem;
+}
+
+.searchv2-flow-column-title {
+  margin-bottom: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.searchv2-flow-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.searchv2-flow-node {
+  display: grid;
+  gap: 0.08rem;
+  border: 1px solid var(--border-light);
+  background: var(--bg-tertiary);
+  border-radius: 999px;
+  padding: 0.5rem 0.78rem;
+}
+
+.searchv2-flow-node.focus {
+  border-color: var(--accent-primary);
+  background: var(--accent-light);
+}
+
+.searchv2-flow-node-amount {
+  color: var(--text-primary);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+  font-size: 0.81rem;
+}
+
+.searchv2-flow-node-address {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchv2-flow-node-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.searchv2-flow-middle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  padding: 1.5rem 0.2rem 0;
+}
+
+.searchv2-flow-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent-secondary);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.searchv2-flow-arrow {
+  color: var(--accent-primary);
+  font-size: 1.65rem;
+}
+
+.searchv2-flow-more {
+  margin-top: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.searchv2-flow-footer {
+  margin-top: 0.82rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--border-light);
+  display: flex;
+  gap: 0.4rem 0.9rem;
+  flex-wrap: wrap;
+}
+
+.searchv2-flow-metric {
+  color: var(--text-secondary);
+  font-size: 0.77rem;
+}
+
+.searchv2-flow-metric strong {
+  color: var(--text-primary);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.searchv2-flow-net.positive strong {
+  color: var(--success);
+}
+
+.searchv2-flow-net.negative strong {
+  color: var(--error);
+}
+
+.searchv2-flow-net.flat strong {
+  color: var(--text-primary);
+}
+
+.searchv2-address-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.searchv2-address-stats .stat-card {
+  min-width: 0;
+}
+
+.searchv2-address-hash {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(0.85rem, 1.2vw, 1rem);
+}
+
+.searchv2-positive {
+  color: var(--success);
+}
+
+.searchv2-negative {
+  color: var(--error);
+}
+
+.searchv2-address-flows .card-header {
+  align-items: center;
+}
+
+.searchv2-address-total {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.searchv2-inline-state {
+  padding: 1.15rem 0.3rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.searchv2-pagination-label {
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+}
+
+.searchv2-block-match {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.searchv2-block-text {
+  margin-top: 0.35rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1100px) {
+  .searchv2-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .searchv2-summary-item {
+    border-right: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .searchv2-summary-item:nth-child(2n) {
+    border-right: none;
+  }
+
+  .searchv2-summary-item:nth-last-child(-n + 2) {
+    border-bottom: none;
+  }
+
+  .searchv2-address-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .searchv2-address-stats .stat-card:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 860px) {
+  .searchv2-flow-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .searchv2-flow-middle {
+    padding: 0.1rem 0 0.2rem;
+    transform: rotate(90deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .searchv2-query-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchv2-query-form .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .searchv2-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .searchv2-summary-item {
+    border-right: none;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .searchv2-summary-item:last-child {
+    border-bottom: none;
+  }
+
+  .searchv2-address-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .searchv2-block-match {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1,0 +1,47 @@
+# Reference systemd unit for the DefTrack API server.
+# Install as /etc/systemd/system/deftrack.service, then run:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now deftrack.service
+#
+# /opt/deftrack is a neutral example checkout path, and "deftrack" is a
+# dedicated service account with no sudo rights and no login shell; it only
+# needs read access to the checkout. The npm run ops:* scripts default to the
+# checkout they are run from. See docs/operations.md.
+#
+# systemd reads EnvironmentFile before it drops privileges, so .env can stay
+# mode 600 and owned by the checkout owner. Values from EnvironmentFile override
+# Environment= lines, so .env must not set NODE_ENV (or must set it to
+# production); otherwise the app does not run in production mode.
+#
+# The app binds to 127.0.0.1 on PORT (default 3001) and logs to the journal
+# (journalctl -u deftrack.service). It writes no files of its own.
+#
+# NoNewPrivileges=true also blocks sudo inside the service. The optional
+# Telegram bot commands (TELEGRAM_REINDEX_COMMAND, TELEGRAM_DAEMON_STATUS_COMMAND)
+# run as this service account, so they cannot use sudo under this unit.
+
+[Unit]
+Description=DefTrack Explorer API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deftrack
+Group=deftrack
+WorkingDirectory=/opt/deftrack
+EnvironmentFile=/opt/deftrack/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/deftrack/server/dist/index.js
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+# Sandboxing
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

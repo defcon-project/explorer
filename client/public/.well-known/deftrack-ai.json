@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "name": "DefTrack DeFCoN Explorer",
+  "description": "Live blockchain explorer for the DeFCoN (DFCN) network. Look up addresses, transactions, blocks and masternode status.",
+  "base_url": "https://deftrack.xyz",
+  "ticker": "DFCN",
+  "amount_unit": "satoshi",
+  "amount_format": "integer string",
+  "satoshi_per_coin": 100000000,
+  "address_prefix": "D",
+  "docs": {
+    "llms_txt": "https://deftrack.xyz/llms.txt",
+    "llms_full_txt": "https://deftrack.xyz/llms-full.txt",
+    "openapi": "https://deftrack.xyz/api/docs/openapi.json"
+  },
+  "endpoints": [
+    {
+      "name": "lookup",
+      "description": "Auto-detect and look up a DeFCoN address, transaction hash, block hash, or block height in one call.",
+      "method": "GET",
+      "path": "/api/ai/lookup",
+      "params": [
+        {
+          "name": "q",
+          "required": true,
+          "description": "A DeFCoN address (starts with D), a 64-char hex hash (tx or block), or a block height integer."
+        }
+      ],
+      "examples": [
+        "/api/ai/lookup?q=D9uqHkeoqWDQ6CZS7BekgdVozuJ33yYFby",
+        "/api/ai/lookup?q=a9d2e303f79dad1fb8da2cc500f3d03370687fe9985bb3d9c2b9a2b95da34ac6",
+        "/api/ai/lookup?q=80759"
+      ]
+    },
+    {
+      "name": "network",
+      "description": "Current network status: latest block height and masternode summary.",
+      "method": "GET",
+      "path": "/api/ai/network",
+      "params": []
+    },
+    {
+      "name": "masternode",
+      "description": "Look up a masternode by IP, IP:port or proTxHash.",
+      "method": "GET",
+      "path": "/api/ai/masternode",
+      "params": [
+        {
+          "name": "q",
+          "required": true,
+          "description": "IP, IP:port (e.g. 203.0.113.10:8192) or proTxHash. A bare IP matches the masternode registered on that IP."
+        }
+      ]
+    }
+  ],
+  "rules": [
+    "Always fetch live data from the API; do not hallucinate balances or transaction details.",
+    "DeFCoN addresses start with the letter D and are 26-34 characters long.",
+    "64-character hex strings are automatically detected as either tx hash or block hash.",
+    "All amount fields (balance, totalReceived, totalSent, reward, totalIn, totalOut, fee) are integer strings in satoshis (e.g. '1050000000000' = 10,500 DFCN). Divide by 100000000 for DFCN.",
+    "Each successful response includes data.explorerUrl, a link to the human-readable explorer page.",
+    "Errors return success: false with an error or hint field and HTTP status 400, 404 or 500. HTTP 429 means the per-IP rate limit was reached."
+  ]
+}

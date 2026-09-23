@@ -1,0 +1,56 @@
+.test-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.test-disclaimer {
+  margin-bottom: 1rem;
+  border-color: var(--warning);
+  background: linear-gradient(180deg, var(--warning-bg), var(--bg-card));
+}
+
+.test-disclaimer-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.4rem;
+}
+
+.test-disclaimer-head strong {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.test-disclaimer p {
+  margin: 0.2rem 0;
+  color: var(--text-secondary);
+  font-size: 0.87rem;
+  line-height: 1.55;
+}
+
+.test-disclaimer-foot {
+  margin-top: 0.35rem;
+  font-size: 0.84rem;
+}
+
+.test-chart-card {
+  padding-bottom: 0.75rem;
+}
+
+.test-chart-meta {
+  margin: -0.15rem 0 0.65rem;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.test-chart-frame {
+  width: 100%;
+  height: 255px;
+}
+
+@media (max-width: 1080px) {
+  .test-grid {
+    grid-template-columns: 1fr;
+  }
+}

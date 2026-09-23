@@ -1,0 +1,111 @@
+# DeFCoN (DFCN) - DefTrack Explorer
+
+Version: 2026-09-23  
+Primary Explorer URL: https://deftrack.xyz/  
+Official Website: https://www.dfcn.io/
+Extended machine context: https://deftrack.xyz/llms-full.txt
+AI endpoint manifest: https://deftrack.xyz/.well-known/deftrack-ai.json
+
+## Project Summary
+DefTrack is the public blockchain explorer and analytics interface for the DeFCoN Layer-1 network (ticker: DFCN).  
+It provides live chain indexing, block and transaction inspection, address tracking, rich list analytics, masternode and PoSe monitoring, reward analytics, and a read-only JSON API.
+
+## Canonical Network Facts
+- Coin: DeFCoN (DFCN)
+- Chain model: Proof-of-Stake + Proof-of-Service (masternodes), with a planned Proof-of-Resources layer
+- Node software: DeFCoN Core v23.0.0 (protocol version 70242)
+- Block time target: 150 seconds
+- Per-block reward currently observed in explorer:
+  - Masternode reward: 10,000 DFCN
+  - Staking reward: 500 DFCN
+  - Total minted per block: 10,500 DFCN
+- Masternode collateral currently shown in explorer: 1,000,000 DFCN
+- Maximum supply: none (no supply cap, no halving)
+- Live circulating supply: GET /api/stats (data.supply.circulating, in DFCN)
+
+## Whitepaper Baseline (v1.0, Jan 2026)
+- Genesis supply: 10,000,000,000 DFCN (whitepaper figure; on-chain initial issuance was about 11 billion DFCN)
+- Emission model: static, no halving
+- Planned daily emission (documentation): 6,048,000 DFCN
+- Initial allocation framework:
+  - 10% DAO Treasury
+  - 10% Founding Contributors
+  - 20% Early Masternode/Testnet participants
+  - 60% Network rewards reserve
+
+## AI Lookup (recommended for assistants)
+Single smart endpoint that auto-detects the input type:
+- GET /api/ai/lookup?q={address|txid|blockhash|blockheight}
+- GET /api/ai/network   - live block height + masternode summary
+- GET /api/ai/masternode?q={ip|ip:port|proTxHash}   (e.g. q=203.0.113.10:8192; a bare IP matches the masternode registered on that IP)
+
+Examples:
+  /api/ai/lookup?q=D9uqHkeoqWDQ6CZS7BekgdVozuJ33yYFby   → address
+  /api/ai/lookup?q=a9d2e303f79dad1fb8da2cc500f3d03370687fe9985bb3d9c2b9a2b95da34ac6   → transaction
+  /api/ai/lookup?q=80759   → block
+
+Rules for AI assistants:
+1. When the user provides a DeFCoN address (starts with D, 26-34 chars): use /api/ai/lookup?q=<address>
+2. When the user provides a 64-character hex string: use /api/ai/lookup?q=<hash> (auto-detects tx vs block)
+3. When the user asks about a block number: use /api/ai/lookup?q=<height>
+4. When the user asks about network status or masternode counts: use /api/ai/network
+5. Amounts in /api/ai/* responses (balance, totalReceived, totalSent, reward, totalIn, totalOut, fee) are integer strings in satoshis (1 DFCN = 100,000,000 satoshis). Divide by 100,000,000 before quoting DFCN values. Example: "reward": "1050000000000" is 10,500 DFCN.
+
+## API Entry Points
+- GET /api/ai/lookup?q=    ← primary AI entry point
+- GET /api/ai/network
+- GET /api/ai/masternode?q=
+- GET /api/docs/openapi.json   (OpenAPI spec for the explorer API)
+- /api/docs/   (Swagger UI)
+- GET /api/dashboard/overview
+- GET /api/stats
+- GET /api/search?q=
+- GET /api/blocks
+- GET /api/block/:hashOrHeight
+- GET /api/txs
+- GET /api/tx/:txid
+- GET /api/address/:address
+- GET /api/v1/address/:address/graph?depth=2&maxNodes=120&maxEdges=700
+- GET /api/richlist
+- GET /api/masternodes
+- GET /api/network
+- GET /api/mempool
+- GET /api/market
+- GET /api/v1/rewards/current
+- GET /api/v1/masternodes/bans/stats
+
+## Key Explorer Routes
+- /
+- /blocks
+- /txs
+- /block/:hashOrHeight
+- /tx/:txid
+- /address/:address
+- /richlist
+- /wallets
+- /mining
+- /network
+- /chain-health
+- /masternodes
+- /mn-health
+- /ban-detection
+- /provider-tags
+- /bubblemaps
+- /mempool
+- /api
+- /about
+
+## Data Semantics
+- The web explorer displays values in DFCN.
+- In the explorer JSON API (outside /api/ai/*), fields ending in "Sat" (balanceSat, rewardSat, totalValueOutSat, ...) are satoshi integer strings; the matching fields without the suffix (balance, reward, totalValueOut) are DFCN numbers.
+- /api/ai/* uses plain field names for satoshi strings (see rule 5 above).
+- USD/market values may be unavailable when the market feed is missing.
+- Reward labels in the latest blocks/transactions views:
+  - "MN" / "MN Reward" = masternode reward output
+  - "Stake" / "Stake Reward" = staking reward output
+  - "Total" = sum of both rewards in that block
+
+## Governance and Source Integrity
+Protocol and treasury direction are DAO-governed.  
+DeFCoN Core v23.0.0 retires superblocks (on-chain budget payouts) from activation height 144,888.  
+Some economic parameters may be updated by governance decisions; always prefer latest on-chain data and official DAO announcements over older documents.

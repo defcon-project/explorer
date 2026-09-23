@@ -1,0 +1,150 @@
+.ppw-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.ppw-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 1.1rem;
+  box-shadow: var(--card-shadow);
+}
+
+.ppw-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  border: 1px solid color-mix(in oklab, var(--warning) 38%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--warning) 12%, transparent);
+  color: var(--warning);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.6rem;
+}
+
+.ppw-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.ppw-stat {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 0.9rem;
+}
+
+.ppw-stat span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ppw-stat strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--text);
+  font-size: 1.7rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ppw-card {
+  padding: 1rem;
+}
+
+.ppw-table-wrap {
+  overflow-x: auto;
+}
+
+.ppw-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.ppw-table th,
+.ppw-table td {
+  border-bottom: 1px solid var(--border-soft);
+  padding: 0.85rem 0.75rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.ppw-table th {
+  color: var(--text-subtle);
+  background: var(--surface-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ppw-table tbody tr:hover {
+  background: color-mix(in oklab, var(--accent) 7%, transparent);
+}
+
+.ppw-primary {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.ppw-muted {
+  margin-top: 0.24rem;
+  color: var(--text-subtle);
+  font-size: 0.8rem;
+}
+
+.ppw-penalty {
+  display: inline-flex;
+  min-width: 3rem;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--warning) 42%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--warning) 14%, transparent);
+  color: var(--warning);
+  padding: 0.25rem 0.55rem;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.ppw-link {
+  color: var(--accent);
+}
+
+.ppw-empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  padding: 1.4rem;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .ppw-hero {
+    flex-direction: column;
+  }
+
+  .ppw-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .ppw-stats {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "owner": "DeFTrack maintainers",
+  "scripts": [
+    {
+      "path": "scripts/ops/lib.sh",
+      "status": "supported",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Shared safety, configuration, privilege, path, health-check, and credential helpers for supported operations.",
+      "invocation": "Internal library; source only from scripts/ops/*.sh.",
+      "safety": "Strict shell mode, path containment, hidden secret values, and temporary MongoDB config files with mode 0600."
+    },
+    {
+      "path": "scripts/ops/preflight.sh",
+      "status": "supported",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Read-only production checkout, environment, service, and readiness validation.",
+      "invocation": "npm run ops:preflight -- --require-clean",
+      "safety": "Does not modify Git, dependencies, service state, or data and never prints secret values."
+    },
+    {
+      "path": "scripts/ops/deploy.sh",
+      "status": "supported",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Deploy a verified production branch to the systemd-managed DeFTrack service.",
+      "invocation": "npm run ops:deploy -- --dry-run; npm run ops:deploy",
+      "safety": "Requires a clean checkout on the expected branch, uses fast-forward-only Git updates, runs checks and build before restart, and verifies readiness."
+    },
+    {
+      "path": "scripts/ops/backup.sh",
+      "status": "supported",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Create compressed, complete-marker-protected MongoDB backups with bounded retention.",
+      "invocation": "npm run ops:backup -- --dry-run; npm run ops:backup",
+      "safety": "Uses a mode-0600 temporary MongoDB config, removes incomplete dumps, and restricts retention deletion to the backup root."
+    },
+    {
+      "path": "scripts/ops/restore.sh",
+      "status": "supported",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Restore a verified MongoDB dump after creating a safety backup.",
+      "invocation": "npm run ops:restore -- --backup defcon_explorer_TIMESTAMP --dry-run; add --yes for a real restore.",
+      "safety": "Requires an in-root completed backup and explicit --yes, creates a pre-restore backup, controls systemd state, and verifies readiness."
+    },
+    {
+      "path": "scripts/perf/api-benchmark.mjs",
+      "status": "supported",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Measure API latency, throughput, and error rate against an explicitly selected base URL.",
+      "invocation": "npm run perf:api -- --baseUrl http://127.0.0.1:3001 --durationSec 30 --concurrency 25",
+      "safety": "Read-only benchmark; run it only against infrastructure you operate and size concurrency for the target environment."
+    },
+    {
+      "path": "scripts/perf/ws-benchmark.mjs",
+      "status": "supported",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Measure WebSocket connection and event-delivery behavior.",
+      "invocation": "npm run perf:ws -- --url ws://127.0.0.1:3001/ws --connections 8 --holdSec 20 --connectSpreadMs 4000",
+      "safety": "Read-only benchmark; run it only against infrastructure you operate and size connection count and spread for the target environment."
+    },
+    {
+      "path": "scripts/validate-operations.mjs",
+      "status": "supported",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Ensure every retained operational script is explicitly classified and documented.",
+      "invocation": "npm run ops:validate",
+      "safety": "Read-only repository inventory validation."
+    },
+    {
+      "path": "scripts/deploy.sh",
+      "status": "compatibility",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Preserve the former deploy entry point while forwarding to the supported workflow.",
+      "invocation": "scripts/deploy.sh --dry-run",
+      "safety": "Executes scripts/ops/deploy.sh without maintaining a second implementation."
+    },
+    {
+      "path": "scripts/backup.sh",
+      "status": "compatibility",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Preserve the former backup entry point while forwarding to the supported workflow.",
+      "invocation": "scripts/backup.sh --dry-run",
+      "safety": "Executes scripts/ops/backup.sh without maintaining a second implementation."
+    },
+    {
+      "path": "scripts/restore.sh",
+      "status": "compatibility",
+      "owner": "DeFTrack maintainers",
+      "purpose": "Preserve the former restore entry point while forwarding to the supported workflow.",
+      "invocation": "scripts/restore.sh --backup NAME --dry-run",
+      "safety": "Executes scripts/ops/restore.sh without maintaining a second implementation."
+    }
+  ]
+}

@@ -9,7 +9,7 @@ export interface IStats {
   };
   supply: {
     circulating: number;
-    max: number | null; // null indicates dynamic supply managed by DAO
+    max: number | null; // null = no hard cap (fixed per-block emission)
   };
   blockReward: number;
   stakingReward?: number;

@@ -205,7 +205,7 @@ Baseline guidance for an explorer host. The reference files in `docs/server-conf
 
 ## Node Feeds
 
-`DNS_SEEDER_API_URL` and `PRE_RELEASE_NODES_API_URL` have no default: they no longer fall back to a built-in value. An empty or unset value disables that feed. `/api/network/dns-seeder-nodes` and `/api/network/pre-release-nodes` then return an empty list, and the node inventory skips the source. **Before you deploy this version to an installation that uses these feeds, set both URLs explicitly in the production `.env`, or the feeds stop.** `PRE_RELEASE_NODES_API_KEY` is required in production only when `PRE_RELEASE_NODES_API_URL` is set.
+`DNS_SEEDER_API_URL` and `PRE_RELEASE_NODES_API_URL` have no default. An empty or unset value disables that feed: `/api/network/dns-seeder-nodes` and `/api/network/pre-release-nodes` return an empty list, and the node inventory skips the source. Preflight reports whether each URL is set. `PRE_RELEASE_NODES_API_KEY` is required in production only when `PRE_RELEASE_NODES_API_URL` is set.
 
 ## Benchmarks
 

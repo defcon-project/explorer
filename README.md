@@ -1,3 +1,5 @@
+<img src="docs/assets/logo.png" alt="DeFCoN Explorer logo" width="104" align="right">
+
 # DeFCoN Explorer
 
 [![CI](https://github.com/defcon-project/explorer/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/defcon-project/explorer/actions/workflows/ci.yml)

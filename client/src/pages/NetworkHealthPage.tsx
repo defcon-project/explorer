@@ -29,10 +29,19 @@ interface ChainReference {
   hash: string;
 }
 
+// Display-only status for live peers whose height is close to the seed baseline.
+type ChainDisplayStatus = SeedChainStatus | 'near-tip';
+
 interface ChainComparison {
-  status: SeedChainStatus;
+  status: ChainDisplayStatus;
   delta?: number;
 }
+
+// A live peer's height is the explorer node's view of that peer (max of synced_headers and
+// synced_blocks). It only advances when that peer announces a block to us, so a well-connected
+// peer that is rarely first to announce can trail the tip by several blocks while fully in sync.
+// Only a larger gap is shown as behind or ahead.
+const LIVE_PEER_HEIGHT_TOLERANCE_BLOCKS = 10;
 
 const BLOCK_HASH_PATTERN = /^[0-9a-f]{64}$/i;
 
@@ -41,8 +50,8 @@ function normalizeBlockHash(value: string | null | undefined): string | null {
   return BLOCK_HASH_PATTERN.test(hash) ? hash : null;
 }
 
-function seedChainBadge(status: SeedChainStatus, blocksDelta?: number): React.ReactNode {
-  const map: Record<SeedChainStatus, { label: string; className: string }> = {
+function seedChainBadge(status: ChainDisplayStatus, blocksDelta?: number): React.ReactNode {
+  const map: Record<ChainDisplayStatus, { label: string; className: string }> = {
     'seed-baseline': { label: 'SEED CONSENSUS', className: 'badge success' },
     'matches-seed': { label: 'MATCHES SEED', className: 'badge success' },
     'seed-divergence': { label: 'SEED DIVERGENCE', className: 'badge error' },
@@ -50,12 +59,13 @@ function seedChainBadge(status: SeedChainStatus, blocksDelta?: number): React.Re
     behind: { label: 'BEHIND', className: 'badge warning' },
     ahead: { label: 'AHEAD', className: 'badge badge-accent' },
     'height-match': { label: 'HEIGHT MATCH ONLY', className: 'badge' },
+    'near-tip': { label: 'NEAR TIP', className: 'badge' },
     'not-comparable': { label: 'NOT COMPARABLE', className: 'badge' },
   };
   const state = map[status] ?? map['not-comparable'];
 
   let deltaLabel = '';
-  if (typeof blocksDelta === 'number' && blocksDelta !== 0) {
+  if (status !== 'near-tip' && typeof blocksDelta === 'number' && blocksDelta !== 0) {
     deltaLabel = blocksDelta > 0 ? ` +${blocksDelta}` : ` ${blocksDelta}`;
   }
 
@@ -147,6 +157,22 @@ function deriveChainComparison(
   if (delta === 0) return { status: 'height-match', delta };
   if (delta < 0) return { status: 'behind', delta };
   return { status: 'ahead', delta };
+}
+
+function deriveLivePeerComparison(
+  blockHeight: number | null,
+  bestBlockHash: string | null | undefined,
+  reference: ChainReference | null
+): ChainComparison {
+  const comparison = deriveChainComparison(blockHeight, bestBlockHash, reference);
+  if (
+    (comparison.status === 'behind' || comparison.status === 'ahead') &&
+    typeof comparison.delta === 'number' &&
+    Math.abs(comparison.delta) <= LIVE_PEER_HEIGHT_TOLERANCE_BLOCKS
+  ) {
+    return { status: 'near-tip', delta: comparison.delta };
+  }
+  return comparison;
 }
 
 export default function NetworkHealthPage() {
@@ -503,7 +529,7 @@ export default function NetworkHealthPage() {
                           ? `protocol ${node.protocolVersion}`
                           : '-';
                       const chain = node.isLivePeer
-                        ? deriveChainComparison(node.blockHeight, node.bestBlockHash, seedReference)
+                        ? deriveLivePeerComparison(node.blockHeight, node.bestBlockHash, seedReference)
                         : { status: 'not-comparable' as const };
                       const displayedHeight = node.isLivePeer ? node.blockHeight : node.snapshotBlockHeight;
                       return (

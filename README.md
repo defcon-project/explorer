@@ -27,11 +27,6 @@ node monitoring.
 | Wallet graph | Bubblemaps: the transaction graph around an address |
 | AI access | Read-only `/api/ai/*` endpoints, `/llms.txt` and an [MCP server](mcp/README.md) |
 
-The explorer follows DeFCoN Core **v23**, which activates at block **144,888** on mainnet and moves
-ChainLocks and InstantSend to the Q60 quorum. See the
-[DeFCoN Core v23.0.0 release](https://github.com/defcon-project/defcon/releases/tag/v23.0.0) for the
-network changes.
-
 ## How it fits together
 
 | Workspace | |
@@ -47,7 +42,7 @@ chain reorganizations. In production the server also serves the built client. It
 
 ## Running locally
 
-You need Node.js at the version in [`.node-version`](.node-version), MongoDB, and a DeFCoN Core v23 node
+You need Node.js at the version in [`.node-version`](.node-version), MongoDB, and a DeFCoN Core node
 with `server=1` and RPC reachable only from localhost or a private network (`txindex=1` is recommended).
 
 ```bash

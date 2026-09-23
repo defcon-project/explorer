@@ -11,7 +11,7 @@ const SERVER_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
   second: '2-digit',
   hour12: true,
-  timeZone: 'Europe/Budapest',
+  timeZone: 'UTC',
   timeZoneName: 'short',
 });
 
@@ -22,7 +22,7 @@ const BUILD_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   hour: '2-digit',
   minute: '2-digit',
   hour12: false,
-  timeZone: 'Europe/Budapest',
+  timeZone: 'UTC',
   timeZoneName: 'short',
 });
 

@@ -19,19 +19,12 @@ backups/
 *.bak.*
 *.bak-*
 
-# report preview artifacts
-**/.preview-report.png
-
-# Local tool settings and working notes
+# Local tool settings
 .claude/settings.local.json
 CLAUDE.local.md
-HANDOFF.md
-nextstep.md
 
-# Local-only working directories at the repository root
+# Local output directories at the repository root
 /artifacts/
-/configs/
-/core/
 
 # Keys and certificates
 *.pem

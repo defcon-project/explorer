@@ -1,29 +1,15 @@
-import { useState } from 'react';
 import {
   HiOutlineInformationCircle,
   HiOutlineShieldCheck,
   HiOutlineCube,
   HiOutlineLink,
-  HiOutlineHeart,
-  HiOutlineClipboardDocument,
-  HiOutlineCheck,
 } from 'react-icons/hi2';
 import { useQuery } from '@tanstack/react-query';
 import { fetchBlock, fetchCoin } from '../services/api';
 import { formatNumber } from '../utils/formatters';
 import './PageStyles.css';
 
-const DONATE_ADDRESS = 'D9uqHkeoqWDQ6CZS7BekgdVozuJ33yYFby';
-
 export default function AboutPage() {
-  const [copied, setCopied] = useState(false);
-
-  const copyAddress = () => {
-    navigator.clipboard.writeText(DONATE_ADDRESS);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const { data: coin } = useQuery({
     queryKey: ['coin'],
     queryFn: fetchCoin,
@@ -110,45 +96,6 @@ export default function AboutPage() {
               <a href="https://x.com/dfcn_io" target="_blank" rel="noopener noreferrer" className="hash">x.com/dfcn_io</a>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginTop: '1.5rem' }}>
-        <div className="card-header">
-          <h2 className="card-title"><HiOutlineHeart /> Donate</h2>
-        </div>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-          Help cover server &amp; infrastructure costs. Any amount is appreciated.
-        </p>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          padding: '0.75rem 1rem',
-          background: 'var(--bg-tertiary)',
-          borderRadius: '8px',
-          border: '1px solid var(--border-color)',
-        }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-            DFCN Address
-          </span>
-          <code style={{
-            flex: 1,
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: '0.85rem',
-            color: 'var(--accent-primary)',
-            wordBreak: 'break-all',
-          }}>
-            {DONATE_ADDRESS}
-          </code>
-          <button
-            onClick={copyAddress}
-            className="copy-btn"
-            title="Copy address"
-            style={{ marginLeft: 'auto', flexShrink: 0 }}
-          >
-            {copied ? <><HiOutlineCheck /> Copied</> : <><HiOutlineClipboardDocument /> Copy</>}
-          </button>
         </div>
       </div>
     </div>

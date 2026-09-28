@@ -410,7 +410,7 @@ export const openApiDocument: OpenApiDocument = {
       get: {
         tags: ['V1', 'Masternodes'],
         summary: 'Version distribution for current ENABLED and POSE_PENALTY masternodes',
-        description: 'Counts masternode identities from the current daemon snapshot. Matches versions by current IP and port. Only observations within 24 hours enter version buckets; stale and unknown observations remain in the denominator. Active status is not a reachability probe. Returns 503 when the status snapshot or inventory cannot be read.',
+        description: 'Counts masternode identities from the current daemon snapshot. Matches last-known versions by current IP and port, including older observations in their version buckets. All active nodes, including unknown versions, remain in the denominator. Freshness is reported separately using a 24-hour window. Active status is not a reachability probe. Returns 503 when the status snapshot or inventory cannot be read.',
         responses: {
           200: openApiSuccessResponse('ActiveMasternodeVersionsApiResponse'),
           503: OpenApiResponses.serviceUnavailable,

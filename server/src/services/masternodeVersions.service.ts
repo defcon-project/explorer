@@ -58,8 +58,11 @@ export async function getActiveMasternodeVersions(): Promise<ActiveMasternodeVer
     };
   }).sort((a, b) => (a.ip || a.id).localeCompare(b.ip || b.id, undefined, { numeric: true }) || a.id.localeCompare(b.id));
   const fresh = nodes.filter((node) => node.versionState === 'fresh');
+  const identified = nodes.filter((node) => node.walletVersion != null);
   const counts = new Map<string, number>();
-  for (const node of fresh) counts.set(node.walletVersion!, (counts.get(node.walletVersion!) ?? 0) + 1);
+  // Age describes evidence quality, not active membership or version identity.
+  // Retain older observations in their last-known version bucket.
+  for (const node of identified) counts.set(node.walletVersion!, (counts.get(node.walletVersion!) ?? 0) + 1);
   const percentage = (count: number) => nodes.length > 0 ? Math.round(count / nodes.length * 10_000) / 100 : 0;
   return {
     generatedAt: new Date(now).toISOString(),
@@ -75,8 +78,8 @@ export async function getActiveMasternodeVersions(): Promise<ActiveMasternodeVer
       stale: nodes.filter((node) => node.versionState === 'stale').length,
       unknown: nodes.filter((node) => node.versionState === 'unknown').length,
       coveragePct: percentage(fresh.length),
-      recommended: fresh.filter((node) => !node.isDeprecated).length,
-      deprecated: fresh.filter((node) => node.isDeprecated).length,
+      recommended: identified.filter((node) => !node.isDeprecated).length,
+      deprecated: identified.filter((node) => node.isDeprecated).length,
     },
     versions: [...counts].map(([version, count]) => ({
       version, count, sharePct: percentage(count), isDeprecated: isDeprecated(version, requiredVersion),

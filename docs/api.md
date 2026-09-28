@@ -102,9 +102,13 @@ The public Network page uses `GET /api/v1/node-inventory/active-versions`:
   deduplicated by masternode identity. Banned, inactive and removed entries cannot
   re-enter through old inventory records. Active status is not proof of reachability;
   a missing crawler observation alone does not mark a masternode offline.
-- Versions are joined by the current IP and port. Only `lastVersionObservedAt`
-  within the last 24 hours qualifies as fresh. Old, undated or future-dated versions
-  are stale; missing versions are unknown. All active nodes stay in the denominator.
+- Versions are joined by the current IP and port. Every known version is counted
+  in its version bucket, including older observations. Missing versions are unknown;
+  all active nodes stay in the denominator. Freshness is independent: only
+  `lastVersionObservedAt` within the last 24 hours qualifies as fresh. Old, undated
+  or future-dated observations are stale, but still count toward their last-known
+  version. `recommended` and `deprecated` count all identified versions;
+  `coveragePct` continues to describe fresh observation coverage.
 - The response exposes `statusObservedAt`, the configured `inventoryPollSeconds`
   and `versionMaxAgeSeconds`. The browser polls every 30 seconds while visible;
   inventory collection defaults to 300 seconds. External source delays are additional.

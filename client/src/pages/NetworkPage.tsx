@@ -140,17 +140,15 @@ export default function NetworkPage() {
         isDeprecated: entry.isDeprecated,
         color: entry.isDeprecated ? 'var(--danger)' : versionColors[index % versionColors.length],
       }));
-      for (const [name, count, color] of [
-        ['Stale version', versionSample?.summary.stale ?? 0, 'var(--warning)'],
-        ['Unknown version', versionSample?.summary.unknown ?? 0, 'var(--text-subtle)'],
-      ] as const) {
-        if (count > 0) identifiedVersions.push({
-          name,
-          value: count,
-          sharePct: total > 0 ? count / total * 100 : 0,
+      const unknown = versionSample?.summary.unknown ?? 0;
+      if (unknown > 0) {
+        identifiedVersions.push({
+          name: 'Unknown version',
+          value: unknown,
+          sharePct: total > 0 ? unknown / total * 100 : 0,
           isDeprecated: false,
           isUnknown: true,
-          color,
+          color: 'var(--text-subtle)',
         });
       }
       return identifiedVersions;
@@ -178,9 +176,8 @@ export default function NetworkPage() {
 
   const observedNodes = useMemo(() => {
     const nodes = versionSample?.nodes || [];
-    if (selectedVersion === 'Stale version') return nodes.filter((node) => node.versionState === 'stale');
     if (selectedVersion === 'Unknown version') return nodes.filter((node) => node.versionState === 'unknown');
-    return selectedVersion ? nodes.filter((node) => node.versionState === 'fresh' && node.walletVersion === selectedVersion) : nodes;
+    return selectedVersion ? nodes.filter((node) => node.walletVersion === selectedVersion) : nodes;
   }, [selectedVersion, versionSample?.nodes]);
 
   const observedPageCount = Math.max(1, Math.ceil(observedNodes.length / OBSERVED_PAGE_SIZE));
@@ -275,7 +272,7 @@ export default function NetworkPage() {
                 <h2 className="card-title">{versionScope === 'inventory' ? 'Active Masternode Versions' : 'Direct Peer Versions'}</h2>
                 <p className="network-card-subtitle">
                   {versionScope === 'inventory'
-                    ? 'ENABLED + POSE_PENALTY only. Every percentage uses the full active masternode count.'
+                    ? 'Last known versions of all ENABLED + POSE_PENALTY masternodes. Percentages use the full active count.'
                     : 'Current connections reported by the explorer daemon.'}
                 </p>
               </div>
@@ -301,11 +298,11 @@ export default function NetworkPage() {
               <div className="network-version-summary">
                 <span><strong>{formatNumber(versionSample.summary.total)}</strong> active masternodes</span>
                 <span>
-                  <strong>{versionSample.summary.coveragePct.toFixed(1)}%</strong>
-                  fresh version coverage ({formatNumber(versionSample.summary.fresh)})
+                  <strong>{formatNumber(versionSample.summary.recommended)} ({(versionSample.summary.total > 0 ? versionSample.summary.recommended / versionSample.summary.total * 100 : 0).toFixed(1)}%)</strong>
+                  v{versionSample.requiredVersion} or newer · last known
                 </span>
                 <span className={versionSample.summary.stale > 0 ? 'is-warning' : ''}>
-                  <strong>{formatNumber(versionSample.summary.stale)}</strong> stale version
+                  <strong>{formatNumber(versionSample.summary.stale)}</strong> older / undated observations
                 </span>
                 <span><strong>{formatNumber(versionSample.summary.unknown)}</strong> unknown version</span>
               </div>
@@ -356,8 +353,10 @@ export default function NetworkPage() {
               <div className="network-version-note">
                 <p>{versionSample.summary.enabled} enabled + {versionSample.summary.posePenalty} with PoSe points.
                   {' '}Banned and inactive statuses are excluded. Active status does not prove current reachability.</p>
-                <p>Versions must have been reported within {versionSample.versionMaxAgeSeconds / 3600}h.
-                  {' '}Older or undated versions remain in the active total as stale.</p>
+                <p>All known versions are counted, including older observations.
+                  {' '}{versionSample.summary.fresh} of {versionSample.summary.total} active masternodes
+                  {' '}reported a version within {versionSample.versionMaxAgeSeconds / 3600}h ({versionSample.summary.coveragePct.toFixed(1)}%).
+                  {' '}Observation age is shown separately and does not change the version totals.</p>
                 <p className={nowMs - Date.parse(versionSample.statusObservedAt) > 120_000 ? 'is-warning' : ''}>
                   Status checked <time dateTime={versionSample.statusObservedAt} title={new Date(versionSample.statusObservedAt).toLocaleString()}>{formatObservedAge(versionSample.statusObservedAt, nowMs)}</time>.
                   {' '}Page refresh: 30s. Version collection: every {Math.round(versionSample.inventoryPollSeconds)}s.
@@ -420,7 +419,7 @@ export default function NetworkPage() {
           <div className="card-header">
             <div>
               <h2 className="card-title"><HiOutlineServerStack /> Active Masternodes</h2>
-              <p className="network-card-subtitle">Last reported version per active masternode. Stale and unknown versions remain in the total.</p>
+              <p className="network-card-subtitle">Last reported version per active masternode. Older observations are included in their version totals.</p>
             </div>
             <div className="network-table-actions">
               {selectedVersion && <span className="badge badge-accent">Version: {selectedVersion}</span>}
@@ -457,7 +456,7 @@ export default function NetworkPage() {
                             {node.walletVersion ?? 'Unknown'}
                           </span>
                         </td>
-                        <td><span className={`badge ${node.versionState === 'fresh' ? 'success' : 'warning'}`}>{node.versionState === 'fresh' ? 'Fresh' : node.versionState === 'stale' ? 'Stale' : 'Unknown'}</span></td>
+                        <td><span className={`badge ${node.versionState === 'fresh' ? 'success' : 'warning'}`}>{node.versionState === 'fresh' ? 'Fresh' : node.versionState === 'stale' ? 'Older / undated' : 'Unknown'}</span></td>
                         <td>
                           <div className="network-source-list">
                             {node.sources.map((source) => <span className="badge" key={source}>{sourceLabel(source)}</span>)}

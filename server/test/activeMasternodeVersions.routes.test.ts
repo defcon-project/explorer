@@ -50,9 +50,9 @@ describe('active masternode versions', () => {
     expect(response.headers['cache-control']).toContain('no-store');
     expect(activeMasternodeVersionsApiResponseSchema.safeParse(response.body).success).toBe(true);
     expect(response.body.data.summary).toEqual({ total: 4, enabled: 3, posePenalty: 1,
-      fresh: 2, stale: 1, unknown: 1, coveragePct: 50, recommended: 1, deprecated: 1 });
+      fresh: 2, stale: 1, unknown: 1, coveragePct: 50, recommended: 2, deprecated: 1 });
     expect(response.body.data.versions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ version: '23.0.0', count: 1, sharePct: 25 }),
+      expect.objectContaining({ version: '23.0.0', count: 2, sharePct: 50 }),
       expect.objectContaining({ version: '22.1.4', count: 1, sharePct: 25 }),
     ]));
     expect(response.body.data.nodes.map((n: { id: string }) => n.id)).toEqual(['protx-1', 'protx-2', 'protx-3', 'protx-4']);
@@ -75,6 +75,8 @@ describe('active masternode versions', () => {
       version('3', '23.0.0', 0, { lastVersionObservedAt: null }), version('4', '23.0.0', -1)]);
     const { body } = await request(app).get('/api/v1/node-inventory/active-versions');
     expect(body.data.summary).toMatchObject({ total: 4, fresh: 1, stale: 3, coveragePct: 25 });
+    expect(body.data.versions).toEqual([{ version: '23.0.0', count: 4, sharePct: 100, isDeprecated: false }]);
+    expect(body.data.summary.recommended).toBe(4);
     expect(body.data.nodes.find((n: { id: string }) => n.id === 'protx-3').lastVersionObservedAt).toBeNull();
   });
 

@@ -96,6 +96,24 @@ unset.
 MongoDB. The node-inventory endpoints mark nodes below `NODE_INVENTORY_MIN_VERSION` (default `23.0.0`) as
 deprecated.
 
+The public Network page uses `GET /api/v1/node-inventory/active-versions`:
+
+- Membership comes from the current daemon snapshot (`ENABLED` + `POSE_PENALTY`),
+  deduplicated by masternode identity. Banned, inactive and removed entries cannot
+  re-enter through old inventory records. Active status is not proof of reachability;
+  a missing crawler observation alone does not mark a masternode offline.
+- Versions are joined by the current IP and port. Only `lastVersionObservedAt`
+  within the last 24 hours qualifies as fresh. Old, undated or future-dated versions
+  are stale; missing versions are unknown. All active nodes stay in the denominator.
+- The response exposes `statusObservedAt`, the configured `inventoryPollSeconds`
+  and `versionMaxAgeSeconds`. The browser polls every 30 seconds while visible;
+  inventory collection defaults to 300 seconds. External source delays are additional.
+- HTTP caching is disabled for this endpoint; daemon snapshot reuse follows
+  `CACHE_TTL_SECONDS`. RPC/inventory errors return 503 rather than historical percentages.
+  An empty RPC result also returns 503 because the legacy RPC adapter cannot
+  distinguish an empty network from all fallback calls failing.
+- The older `/versions` endpoint retains its historical IP-sample semantics.
+
 ## Network noise
 
 Agents running next to monitored nodes push observations to `POST /api/v1/network-noise/ingest` with a

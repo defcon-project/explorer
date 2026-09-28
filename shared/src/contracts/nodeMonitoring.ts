@@ -97,6 +97,45 @@ export const networkVersionSampleSchema = z.object({
   nodes: z.array(networkVersionSampleNodeSchema),
 });
 
+export const activeMasternodeVersionsSchema = z.object({
+  generatedAt: isoDateTime,
+  statusObservedAt: isoDateTime,
+  inventoryPollSeconds: finiteNumber.nonnegative(),
+  versionMaxAgeSeconds: nonNegativeInteger,
+  requiredVersion: z.string().min(1),
+  summary: z.object({
+    total: nonNegativeInteger,
+    enabled: nonNegativeInteger,
+    posePenalty: nonNegativeInteger,
+    fresh: nonNegativeInteger,
+    stale: nonNegativeInteger,
+    unknown: nonNegativeInteger,
+    coveragePct: finiteNumber,
+    recommended: nonNegativeInteger,
+    deprecated: nonNegativeInteger,
+  }),
+  versions: z.array(z.object({
+    version: z.string().min(1),
+    count: nonNegativeInteger,
+    sharePct: finiteNumber,
+    isDeprecated: z.boolean(),
+  })),
+  nodes: z.array(z.object({
+    id: z.string().min(1),
+    ip: z.string().nullable(),
+    port: nullableInteger,
+    status: z.enum(['ENABLED', 'POSE_PENALTY']),
+    walletVersion: z.string().nullable(),
+    versionState: z.enum(['fresh', 'stale', 'unknown']),
+    lastVersionObservedAt: isoDateTime.nullable(),
+    lastInventoryObservedAt: isoDateTime.nullable(),
+    sources: z.array(z.string()),
+    isDeprecated: z.boolean(),
+  })),
+});
+export const activeMasternodeVersionsApiResponseSchema = apiSuccessSchema(activeMasternodeVersionsSchema);
+export type ActiveMasternodeVersionsContract = z.infer<typeof activeMasternodeVersionsSchema>;
+
 export const networkNoiseLevelSchema = z.enum(['quiet', 'elevated', 'noisy', 'severe', 'critical']);
 export const networkNoiseRoleSchema = z.enum(['seed', 'fullnode', 'test_mn', 'masternode', 'unknown']);
 

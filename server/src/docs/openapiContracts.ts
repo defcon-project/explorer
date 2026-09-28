@@ -1,5 +1,6 @@
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
+  activeMasternodeVersionsApiResponseSchema,
   banWaveAnalysisApiResponseSchema,
   masternodeApiResponseSchema,
   masternodeDistributionApiResponseSchema,
@@ -24,6 +25,7 @@ type OpenApiSchemaConverter = (
 const convertToOpenApiSchema = zodToJsonSchema as unknown as OpenApiSchemaConverter;
 
 export type OpenApiContractName =
+  | 'ActiveMasternodeVersionsApiResponse'
   | 'StatsApiResponse'
   | 'SearchApiResponse'
   | 'MasternodeApiResponse'
@@ -47,6 +49,7 @@ function toOpenApiSchema(schema: unknown): OpenApiSchema {
  * Do not hand-edit copies of their fields in the OpenAPI document.
  */
 export const openApiContractSchemas: Record<OpenApiContractName, OpenApiSchema> = {
+  ActiveMasternodeVersionsApiResponse: toOpenApiSchema(activeMasternodeVersionsApiResponseSchema),
   StatsApiResponse: toOpenApiSchema(statsApiResponseSchema),
   SearchApiResponse: toOpenApiSchema(searchApiResponseSchema),
   MasternodeApiResponse: toOpenApiSchema(masternodeApiResponseSchema),

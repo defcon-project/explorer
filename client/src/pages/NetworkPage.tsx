@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   HiOutlineGlobeAlt,
   HiOutlineSignal,
   HiOutlineServerStack,
 } from 'react-icons/hi2';
 import { useQuery } from '@tanstack/react-query';
-import { fetchNetworkInfo, fetchNetworkVersionSample } from '../services/api';
-import type { NetworkVersionSampleView, NetworkView } from '../types/api';
+import { fetchNetworkInfo, fetchActiveMasternodeVersions } from '../services/api';
+import type { ActiveMasternodeVersionsView, NetworkView } from '../types/api';
 import { formatNumber, formatAge } from '../utils/formatters';
 import { usePageVisibility } from '../hooks/usePageVisibility';
 import './PageStyles.css';
@@ -17,13 +17,11 @@ interface VersionDatum {
   value: number;
   color: string;
   sharePct: number;
-  identifiedSharePct?: number;
   isDeprecated: boolean;
   isUnknown?: boolean;
 }
 
 const versionColors = ['#1f64d8', '#2f8fff', '#58a8ff', '#4f7fd8', '#5cbfff', '#3f6fc6'];
-const VERSION_SAMPLE_HOURS = 24;
 const OBSERVED_PAGE_SIZE = 50;
 
 type VersionScope = 'inventory' | 'direct';
@@ -44,11 +42,11 @@ function countryCodeToFlag(code: string): string {
   return String.fromCodePoint(first + 127397, second + 127397);
 }
 
-function formatObservedAge(value: string | null | undefined): string {
+function formatObservedAge(value: string | null | undefined, nowMs = Date.now()): string {
   if (!value) return 'N/A';
   const timestamp = new Date(value).getTime();
   if (!Number.isFinite(timestamp)) return 'N/A';
-  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  const seconds = Math.max(0, Math.floor((nowMs - timestamp) / 1000));
   if (seconds < 60) return `${seconds}s ago`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -98,6 +96,12 @@ export default function NetworkPage() {
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
   const [versionScope, setVersionScope] = useState<VersionScope>('inventory');
   const [observedPage, setObservedPage] = useState(0);
+  const [nowMs, setNowMs] = useState(Date.now);
+  useEffect(() => {
+    if (!isPageVisible) return;
+    const timer = window.setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, [isPageVisible]);
   const networkQuery = useQuery<NetworkView>({
     queryKey: ['network'],
     queryFn: fetchNetworkInfo,
@@ -106,13 +110,15 @@ export default function NetworkPage() {
     refetchOnMount: 'always',
   });
   const network = networkQuery.data;
-  const versionSampleQuery = useQuery<NetworkVersionSampleView>({
-    queryKey: ['network', 'version-sample', VERSION_SAMPLE_HOURS],
-    queryFn: () => fetchNetworkVersionSample(VERSION_SAMPLE_HOURS),
-    staleTime: 60_000,
-    refetchInterval: isPageVisible ? 120_000 : false,
+  const versionSampleQuery = useQuery<ActiveMasternodeVersionsView>({
+    queryKey: ['network', 'active-masternode-versions'],
+    queryFn: fetchActiveMasternodeVersions,
+    staleTime: 15_000,
+    refetchInterval: isPageVisible ? 30_000 : false,
+    refetchOnMount: 'always',
+    retry: 1,
   });
-  const versionSample = versionSampleQuery.data;
+  const versionSample = versionSampleQuery.isError ? undefined : versionSampleQuery.data;
   const loading = networkQuery.isLoading;
   const error =
     networkQuery.error != null
@@ -126,28 +132,25 @@ export default function NetworkPage() {
 
   const versionData = useMemo<VersionDatum[]>(() => {
     if (versionScope === 'inventory') {
-      const observed = versionSample?.summary.observed ?? 0;
-      const identified = versionSample?.summary.identified ?? 0;
-      const unidentified = versionSample?.summary.unidentified ?? 0;
-      const coveragePct = versionSample?.summary.coveragePct
-        ?? (observed > 0 ? Math.round((identified / observed) * 10_000) / 100 : 0);
+      const total = versionSample?.summary.total ?? 0;
       const identifiedVersions: VersionDatum[] = (versionSample?.versions || []).map((entry, index) => ({
         name: entry.version,
         value: entry.count,
-        sharePct: entry.observedSharePct
-          ?? (observed > 0 ? Math.round((entry.count / observed) * 10_000) / 100 : 0),
-        identifiedSharePct: entry.sharePct,
+        sharePct: entry.sharePct,
         isDeprecated: entry.isDeprecated,
         color: entry.isDeprecated ? 'var(--danger)' : versionColors[index % versionColors.length],
       }));
-      if (unidentified > 0) {
-        identifiedVersions.push({
-          name: 'Version not reported',
-          value: unidentified,
-          sharePct: Math.max(0, Math.round((100 - coveragePct) * 100) / 100),
+      for (const [name, count, color] of [
+        ['Stale version', versionSample?.summary.stale ?? 0, 'var(--warning)'],
+        ['Unknown version', versionSample?.summary.unknown ?? 0, 'var(--text-subtle)'],
+      ] as const) {
+        if (count > 0) identifiedVersions.push({
+          name,
+          value: count,
+          sharePct: total > 0 ? count / total * 100 : 0,
           isDeprecated: false,
           isUnknown: true,
-          color: 'var(--text-subtle)',
+          color,
         });
       }
       return identifiedVersions;
@@ -175,7 +178,9 @@ export default function NetworkPage() {
 
   const observedNodes = useMemo(() => {
     const nodes = versionSample?.nodes || [];
-    return selectedVersion ? nodes.filter((node) => node.walletVersion === selectedVersion) : nodes;
+    if (selectedVersion === 'Stale version') return nodes.filter((node) => node.versionState === 'stale');
+    if (selectedVersion === 'Unknown version') return nodes.filter((node) => node.versionState === 'unknown');
+    return selectedVersion ? nodes.filter((node) => node.versionState === 'fresh' && node.walletVersion === selectedVersion) : nodes;
   }, [selectedVersion, versionSample?.nodes]);
 
   const observedPageCount = Math.max(1, Math.ceil(observedNodes.length / OBSERVED_PAGE_SIZE));
@@ -229,7 +234,7 @@ export default function NetworkPage() {
     <div className="fade-in">
       <div className="page-header">
         <h1 className="page-title"><HiOutlineGlobeAlt /> Network</h1>
-        <p className="page-subtitle">DeFCoN network overview, peers, and geo distribution</p>
+        <p className="page-subtitle">Active masternode versions and direct peer health</p>
       </div>
 
       {error && (
@@ -263,16 +268,14 @@ export default function NetworkPage() {
         </div>
       </div>
 
-      {(versionData.length > 0 || peers.length > 0) && (
-        <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
-          {versionData.length > 0 && (
+      <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
           <div className="card">
             <div className="card-header network-version-header">
               <div>
-                <h2 className="card-title">Node Version Distribution</h2>
+                <h2 className="card-title">{versionScope === 'inventory' ? 'Active Masternode Versions' : 'Direct Peer Versions'}</h2>
                 <p className="network-card-subtitle">
                   {versionScope === 'inventory'
-                    ? 'Last known daemon version for unique IPs observed across monitored network sources in the last 24 hours.'
+                    ? 'ENABLED + POSE_PENALTY only. Every percentage uses the full active masternode count.'
                     : 'Current connections reported by the explorer daemon.'}
                 </p>
               </div>
@@ -282,7 +285,7 @@ export default function NetworkPage() {
                   className={versionScope === 'inventory' ? 'active' : ''}
                   onClick={() => changeVersionScope('inventory')}
                 >
-                  Network sample
+                  Active masternodes
                 </button>
                 <button
                   type="button"
@@ -296,32 +299,29 @@ export default function NetworkPage() {
 
             {versionScope === 'inventory' && versionSample && (
               <div className="network-version-summary">
-                <span><strong>{formatNumber(versionSample.summary.observed)}</strong> network IPs observed</span>
+                <span><strong>{formatNumber(versionSample.summary.total)}</strong> active masternodes</span>
                 <span>
-                  <strong>{formatNumber(versionSample.summary.identified)}</strong>
-                  version known ({(versionSample.summary.coveragePct
-                    ?? (versionSample.summary.observed > 0
-                      ? (versionSample.summary.identified / versionSample.summary.observed) * 100
-                      : 0)).toFixed(1)}%)
+                  <strong>{versionSample.summary.coveragePct.toFixed(1)}%</strong>
+                  fresh version coverage ({formatNumber(versionSample.summary.fresh)})
                 </span>
-                <span className={versionSample.summary.unidentified > 0 ? 'is-warning' : ''}>
-                  <strong>{formatNumber(versionSample.summary.unidentified)}</strong> version not reported
+                <span className={versionSample.summary.stale > 0 ? 'is-warning' : ''}>
+                  <strong>{formatNumber(versionSample.summary.stale)}</strong> stale version
                 </span>
-                <span><strong>{versionSample.windowHours}h</strong> observation window</span>
+                <span><strong>{formatNumber(versionSample.summary.unknown)}</strong> unknown version</span>
               </div>
             )}
 
             {versionScope === 'inventory' && versionSampleQuery.isLoading ? (
               <div className="placeholder-content network-version-placeholder">
-                <p className="text-muted">Loading network version sample...</p>
+                <p className="text-muted">Loading active masternode versions...</p>
               </div>
             ) : versionScope === 'inventory' && versionSampleQuery.isError ? (
               <div className="placeholder-content network-version-placeholder">
-                <p className="text-muted">The network sample is temporarily unavailable. Direct peer data remains available.</p>
+                <p className="text-muted" role="status">Active masternode data is unavailable. Percentages are hidden until a successful refresh.</p>
               </div>
             ) : versionData.length === 0 ? (
               <div className="placeholder-content" style={{ padding: '2.5rem' }}>
-                <p className="text-muted">No version distribution available</p>
+                <p className="text-muted">{versionScope === 'inventory' ? 'No active masternodes in the current snapshot.' : 'No direct peer versions available.'}</p>
               </div>
             ) : (
               <div className="network-version-list">
@@ -330,37 +330,40 @@ export default function NetworkPage() {
                     key={entry.name}
                     type="button"
                     className={`network-version-row ${entry.isUnknown ? 'unknown' : ''} ${selectedVersion === entry.name ? 'active' : ''}`}
-                    onClick={() => {
-                      if (!entry.isUnknown) toggleVersionFilter(entry.name);
-                    }}
-                    disabled={entry.isUnknown}
-                    title={entry.isUnknown
-                      ? 'These IPs were observed, but their source did not expose a wallet version.'
-                      : `${entry.identifiedSharePct?.toFixed(1)}% of version-identified nodes; ${entry.sharePct.toFixed(1)}% of all observed IPs.`}
+                    onClick={() => toggleVersionFilter(entry.name)}
+                    title={`${entry.sharePct.toFixed(1)}% of ${versionScope === 'inventory' ? 'all active masternodes' : 'direct peers'}. Click to filter.`}
+                    aria-pressed={selectedVersion === entry.name}
                   >
                     <span className="network-version-row-head">
                       <span className="mono">{entry.name}</span>
                       <span>
                         {entry.isDeprecated && <span className="badge warning">Legacy</span>}
                         <strong>{formatNumber(entry.value)}</strong>
-                        <span className="text-muted">{entry.sharePct.toFixed(1)}% observed</span>
+                        <span className="text-muted">{entry.sharePct.toFixed(1)}% {versionScope === 'inventory' ? 'of active' : 'of peers'}</span>
                       </span>
                     </span>
                     <span className="network-version-track" aria-hidden="true">
                       <span
                         className={entry.isDeprecated ? 'network-version-fill deprecated' : 'network-version-fill'}
-                        style={{ width: `${Math.max(entry.sharePct, 2)}%`, background: entry.color }}
+                        style={{ width: `${entry.sharePct}%`, background: entry.color }}
                       />
                     </span>
                   </button>
                 ))}
-                <div className="network-version-note">
-                  <strong className={versionSample && versionSample.summary.deprecated > 0 ? 'is-warning' : ''}>
-                    {formatNumber(versionSample?.summary.deprecated ?? 0)} legacy
-                  </strong>
-                  {' '}among {formatNumber(versionSample?.summary.identified ?? 0)} version-identified nodes.
-                  Version timestamps are retained separately because Masternode RPC exposes node identity and state, but not the daemon wallet version.
-                </div>
+              </div>
+            )}
+            {versionScope === 'inventory' && versionSample && (
+              <div className="network-version-note">
+                <p>{versionSample.summary.enabled} enabled + {versionSample.summary.posePenalty} with PoSe points.
+                  {' '}Banned and inactive statuses are excluded. Active status does not prove current reachability.</p>
+                <p>Versions must have been reported within {versionSample.versionMaxAgeSeconds / 3600}h.
+                  {' '}Older or undated versions remain in the active total as stale.</p>
+                <p className={nowMs - Date.parse(versionSample.statusObservedAt) > 120_000 ? 'is-warning' : ''}>
+                  Status checked <time dateTime={versionSample.statusObservedAt} title={new Date(versionSample.statusObservedAt).toLocaleString()}>{formatObservedAge(versionSample.statusObservedAt, nowMs)}</time>.
+                  {' '}Page refresh: 30s. Version collection: every {Math.round(versionSample.inventoryPollSeconds)}s.
+                  {' '}External monitor delays may add to this.
+                  {versionSampleQuery.isFetching && ' Refreshing…'}
+                </p>
               </div>
             )}
             {selectedVersion && (
@@ -369,8 +372,6 @@ export default function NetworkPage() {
               </button>
             )}
           </div>
-          )}
-
           <div className="card network-sync-card">
             <div className="card-header">
               <div>
@@ -412,27 +413,26 @@ export default function NetworkPage() {
               Height comparison is a sync signal only. It does not establish canonical chain identity during a fork.
             </p>
           </div>
-        </div>
-      )}
+      </div>
 
       {versionScope === 'inventory' ? (
         <div className="card">
           <div className="card-header">
             <div>
-              <h2 className="card-title"><HiOutlineServerStack /> Version-identified Nodes (24h)</h2>
-              <p className="network-card-subtitle">Last known daemon version per unique IP, with the separate time it was last reported.</p>
+              <h2 className="card-title"><HiOutlineServerStack /> Active Masternodes</h2>
+              <p className="network-card-subtitle">Last reported version per active masternode. Stale and unknown versions remain in the total.</p>
             </div>
             <div className="network-table-actions">
               {selectedVersion && <span className="badge badge-accent">Version: {selectedVersion}</span>}
-              <span className="badge">{formatNumber(observedNodes.length)} identified nodes</span>
+              <span className="badge">{formatNumber(observedNodes.length)} active masternodes</span>
             </div>
           </div>
           {versionSampleQuery.isLoading ? (
-            <div className="network-table-placeholder">Loading observed nodes...</div>
+            <div className="network-table-placeholder">Loading active masternodes...</div>
           ) : versionSampleQuery.isError ? (
             <div className="network-table-placeholder">Network inventory is temporarily unavailable.</div>
           ) : observedNodes.length === 0 ? (
-            <div className="network-table-placeholder">No observed nodes match the selected version.</div>
+            <div className="network-table-placeholder">No active masternodes match the selected filter.</div>
           ) : (
             <>
               <div className="table-wrapper">
@@ -440,32 +440,30 @@ export default function NetworkPage() {
                   <thead>
                     <tr>
                       <th>Node</th>
+                      <th>Status</th>
                       <th>Version</th>
-                      <th>Height</th>
-                      <th>Sources</th>
+                      <th>Version quality</th>
+                      <th>Inventory sources</th>
                       <th>Version reported</th>
-                      <th>Last seen</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pagedObservedNodes.map((node) => (
-                      <tr key={node.ip}>
-                        <td className="mono">{node.ip}</td>
+                      <tr key={node.id}>
+                        <td className="mono" title={node.id}>{node.ip ? `${node.ip.includes(':') ? `[${node.ip}]` : node.ip}:${node.port ?? '?'}` : node.id}</td>
+                        <td><span className={`badge ${node.status === 'POSE_PENALTY' ? 'warning' : 'success'}`}>{node.status === 'POSE_PENALTY' ? 'PoSe penalty · active' : 'Enabled'}</span></td>
                         <td>
-                          <span className={`badge ${node.isDeprecated ? 'warning' : 'success'}`}>
-                            {node.walletVersion}
+                          <span className={`badge ${node.versionState !== 'fresh' ? '' : node.isDeprecated ? 'warning' : 'success'}`}>
+                            {node.walletVersion ?? 'Unknown'}
                           </span>
                         </td>
-                        <td className="mono">
-                          {typeof node.blockHeight === 'number' ? formatNumber(node.blockHeight) : 'N/A'}
-                        </td>
+                        <td><span className={`badge ${node.versionState === 'fresh' ? 'success' : 'warning'}`}>{node.versionState === 'fresh' ? 'Fresh' : node.versionState === 'stale' ? 'Stale' : 'Unknown'}</span></td>
                         <td>
                           <div className="network-source-list">
                             {node.sources.map((source) => <span className="badge" key={source}>{sourceLabel(source)}</span>)}
                           </div>
                         </td>
-                        <td className="text-muted">{formatObservedAge(node.lastVersionObservedAt)}</td>
-                        <td className="text-muted">{formatObservedAge(node.lastSeenAt || node.lastObservedAt)}</td>
+                        <td className="text-muted" title={node.lastVersionObservedAt ? new Date(node.lastVersionObservedAt).toLocaleString() : 'No version observation timestamp'}>{formatObservedAge(node.lastVersionObservedAt, nowMs)}</td>
                       </tr>
                     ))}
                   </tbody>

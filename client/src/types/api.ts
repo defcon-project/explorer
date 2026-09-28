@@ -1,4 +1,5 @@
 import type {
+  ActiveMasternodeVersionsContract,
   IAddress,
   IBlock,
   ITransaction,
@@ -38,6 +39,8 @@ import type {
   SearchResultContract,
   StatsDataContract,
 } from '@defcon/shared';
+
+export type ActiveMasternodeVersionsView = ActiveMasternodeVersionsContract;
 
 export interface PaginationMeta {
   page: number;

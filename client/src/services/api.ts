@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type {
+  ActiveMasternodeVersionsView,
   AddressBalanceView,
   AddressGraphView,
   ApiEnvelope,
@@ -43,6 +44,11 @@ import type {
 import type { OpenApiDocument } from '../types/openapi';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
+
+export async function fetchActiveMasternodeVersions() {
+  const { data } = await api.get<ApiEnvelope<ActiveMasternodeVersionsView>>('/v1/node-inventory/active-versions');
+  return data.data;
+}
 
 export const api = axios.create({
   baseURL: `${API_BASE}/api`,

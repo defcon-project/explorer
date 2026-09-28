@@ -2,14 +2,25 @@ import { Router, Request, Response } from 'express';
 import {
   nodeInventoryApiResponseSchema,
   networkVersionSampleApiResponseSchema,
+  activeMasternodeVersionsApiResponseSchema,
 } from '@defcon/shared/dist/contracts';
 import { NodeInventory } from '../../models/NodeInventory';
 import { config } from '../../config';
 import { withCachePolicy } from '../../middleware/cachePolicy';
-import { sendInternalError } from '../../utils/validation';
+import { sendInternalError, sendServiceUnavailable } from '../../utils/validation';
+import { getActiveMasternodeVersions } from '../../services/masternodeVersions.service';
 import { STALE_AFTER_MS } from '../../services/nodeInventory.service';
 
 const router = Router();
+
+router.get('/active-versions', withCachePolicy('no-store'), async (_req: Request, res: Response) => {
+  try {
+    const data = await getActiveMasternodeVersions();
+    return res.json(activeMasternodeVersionsApiResponseSchema.parse({ success: true, data }));
+  } catch (error) {
+    return sendServiceUnavailable(res, 'Active masternode versions unavailable', error);
+  }
+});
 
 type InventoryChainStatus = 'main_chain' | 'ahead' | 'behind' | 'hash_mismatch' | 'unknown';
 const CHAIN_STATUSES = new Set<InventoryChainStatus>(['main_chain', 'ahead', 'behind', 'hash_mismatch', 'unknown']);

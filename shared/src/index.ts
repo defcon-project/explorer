@@ -1,6 +1,7 @@
 export * from './types';
 export * from './constants';
 export type {
+  ActiveMasternodeVersionsContract,
   SearchApiResponse,
   SearchResultContract,
   StatsApiResponse,

@@ -92,14 +92,9 @@
 }
 
 .network-version-row.unknown {
-  cursor: default;
   opacity: 0.82;
 }
 
-.network-version-row.unknown:hover {
-  border-color: var(--border-soft);
-  background: var(--surface-muted);
-}
 
 .network-version-row-head,
 .network-version-row-head > span:last-child {
@@ -156,6 +151,8 @@
 .network-version-note strong.is-warning {
   color: var(--warning);
 }
+
+.network-version-note p.is-warning { color: var(--warning); }
 
 .network-sync-card {
   display: flex;

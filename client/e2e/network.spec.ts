@@ -8,9 +8,9 @@ function fixture() {
     generatedAt: now, statusObservedAt: now, inventoryPollSeconds: 300,
     versionMaxAgeSeconds: 86400, requiredVersion: '23.0.0',
     summary: { total: 4, enabled: 3, posePenalty: 1, fresh: 2, stale: 1, unknown: 1,
-      coveragePct: 50, recommended: 1, deprecated: 1 },
+      coveragePct: 50, recommended: 2, deprecated: 1 },
     versions: [
-      { version: '23.0.0', count: 1, sharePct: 25, isDeprecated: false },
+      { version: '23.0.0', count: 2, sharePct: 50, isDeprecated: false },
       { version: '22.1.4', count: 1, sharePct: 25, isDeprecated: true },
     ],
     nodes: [
@@ -26,21 +26,25 @@ function fixture() {
 const network = { success: true, data: { connections: 1, protocolversion: 70242, blockHeight: 100,
   peers: [{ addr: '203.0.113.1:8192', subver: '/DeFCoN:23.0.0/', synced_blocks: 100, synced_headers: 100, inbound: false }] } };
 
-test('active MN denominator, version quality filters and separate direct peers @smoke', async ({ page }, testInfo) => {
+test('last-known version shares include older observations and keep direct peers separate @smoke', async ({ page }, testInfo) => {
   await stubApi(page, { [path]: { success: true, data: fixture() }, '/api/network': network });
   await page.goto('/network');
   await expect(page.getByRole('heading', { name: 'Active Masternode Versions' })).toBeVisible();
   await expect(page.getByText('PoSe penalty · active')).toBeVisible();
-  await expect(page.locator('.network-version-row')).toHaveCount(4);
-  await expect(page.locator('.network-version-row').first()).toContainText('25.0% of active');
+  await expect(page.locator('.network-version-row')).toHaveCount(3);
+  await expect(page.locator('.network-version-row').first()).toContainText('50.0% of active');
+  await expect(page.locator('.network-version-summary')).toContainText('2 (50.0%)');
+  await expect(page.getByRole('button', { name: /Stale version/ })).toHaveCount(0);
   await expect(page.locator('tbody tr')).toHaveCount(4);
   await expect(page.getByText('Page refresh: 30s.', { exact: false })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('network.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-  await page.getByRole('button', { name: /Stale version/ }).click();
-  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await page.locator('.network-version-row').first().click();
+  await expect(page.locator('tbody tr')).toHaveCount(2);
+  await expect(page.locator('tbody')).toContainText('198.51.100.1');
   await expect(page.locator('tbody')).toContainText('198.51.100.3');
+  await expect(page.locator('tbody')).toContainText('Older / undated');
   await page.getByRole('button', { name: /Unknown version/ }).click();
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await expect(page.locator('tbody')).toContainText('198.51.100.4');
@@ -75,7 +79,7 @@ test('a failed refresh hides previously successful percentages @smoke', async ({
   await page.clock.install();
   await stubApi(page, { [path]: { success: true, data: fixture() }, '/api/network': network });
   await page.goto('/network');
-  await expect(page.locator('.network-version-row')).toHaveCount(4);
+  await expect(page.locator('.network-version-row')).toHaveCount(3);
   await page.route(`**${path}`, (route) => route.fulfill({ status: 503, json: { success: false } }));
   await page.clock.fastForward(31_000);
   await page.clock.resume();

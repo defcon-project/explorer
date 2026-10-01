@@ -11,6 +11,33 @@ Unknown `/api/*` paths return a JSON error instead of the web client.
 
 ## Route groups
 
+### PoSe ban analysis
+
+`GET /api/v1/masternodes/ban-waves` accepts `scope=rolling` (default) or `scope=q60`.
+The Ban Detection page defaults to Q60 history. Q60 selects confirmed bans whose
+`poseBanHeight` is at least mainnet activation height **144888**; a later discovery
+height does not move an older ban into this period. The activation timestamp is
+read from the daemon's block header. If that lookup fails, the endpoint returns an
+error or explicitly marked stale cached history. Events without a known ban height
+are excluded from Q60 analysis and counted in `analysisScope.unclassifiedEvents`.
+
+The requested `hours` window still applies (maximum 2160 hours / 90 days of retained
+history). `analysisScope` describes the effective start and whether it truncates
+the activation period. Current registered/active/banned/penalty counts always refer
+to the full live daemon snapshot, independently of the historical scope.
+When `rpcAvailable=false` or `dataStatus=stale`, these counts must be shown as unknown.
+
+`trackedNodes` includes isolated bans as well as wave members, grouped by stable
+masternode identity and ordered by distinct ban count, then latest event. Duplicate
+observations of the same node and ban block count once. Current state and penalty
+are nullable for unavailable or unregistered nodes. The confirmed-ban timeline
+covers the selected period; the explicitly named `freshDrops24h` and
+`freshDropEvents24h` fields remain 24-hour measures within the selected scope.
+Auto timeline buckets use the effective duration for Q60 views.
+
+Wave grouping remains tunable with `windowMinutes` (5–120), `minNodes` (2–50), and
+`bucket`. Geographic/operator concentration is correlation, not proof of a cause.
+
 | Group | |
 |---|---|
 | `/api/health` | `GET /api/health` and `/api/health/live` report MongoDB connectivity. `/api/health/ready` also checks daemon RPC and returns `ok`, `degraded` or `down`; the deploy script waits on it |

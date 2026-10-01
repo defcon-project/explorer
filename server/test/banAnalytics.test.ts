@@ -3,6 +3,8 @@ import {
   classifyHistoricalBanEvents,
   isActiveMasternodeStatus,
   isConfirmedBanTransition,
+  selectQ60BanEvents,
+  summarizeTrackedBanNodes,
   type HistoricalBanEvent,
 } from '../src/domain/pose/banAnalytics';
 
@@ -38,6 +40,29 @@ function event(overrides: Partial<HistoricalBanEvent> = {}): HistoricalBanEvent 
 }
 
 describe('PoSe ban analytics domain', () => {
+  it('uses the actual ban block for the Q60 boundary, excluding delayed old and unknown observations', () => {
+    const events = [
+      event({ poseBanHeight: 144887, detectedHeight: 144990 }),
+      event({ poseBanHeight: 144888 }),
+      event({ poseBanHeight: 144947 }),
+      event({ poseBanHeight: null, detectedHeight: 144990 }),
+      event({ poseBanHeight: 144999, previousStatus: 'UNKNOWN' }),
+    ];
+    expect(selectQ60BanEvents(events).map((row) => row.poseBanHeight)).toEqual([144888, 144947]);
+  });
+
+  it('counts distinct bans per stable node identity and keeps latest recovery metadata', () => {
+    const rows = summarizeTrackedBanNodes([
+      event({ at: 1000, poseBanHeight: 144888 }),
+      event({ at: 1100, poseBanHeight: 144888, nodeId: 'new-ip' }),
+      event({ at: 2000, poseBanHeight: 144947, service: 'new-service', recoveredAt: 3000 }),
+      event({ at: 1500, poseBanHeight: 144900, nodeId: 'b', dedupeId: 'b', proTxHash: 'b' }),
+      event({ at: 4000, poseBanHeight: 144999, previousStatus: 'NEW' }),
+    ]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ banCount: 2, proTxHash: 'protx-a', service: 'new-service', lastBanHeight: 144947, recoveredAt: new Date(3000).toISOString() });
+    expect(rows[1].banCount).toBe(1);
+  });
   it('treats ENABLED and POSE_PENALTY as active masternode states', () => {
     expect(isActiveMasternodeStatus('ENABLED')).toBe(true);
     expect(isActiveMasternodeStatus('pose_penalty')).toBe(true);

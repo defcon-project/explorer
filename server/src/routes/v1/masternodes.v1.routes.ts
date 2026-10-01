@@ -19,6 +19,10 @@ import {
   banEventIdentity,
   buildBanWaves,
   classifyHistoricalBanEvents,
+  deduplicateBanEvents,
+  Q60_ACTIVATION_HEIGHT,
+  selectQ60BanEvents,
+  summarizeTrackedBanNodes,
   isActiveMasternodeStatus,
   type BanWaveSeverity,
   type HistoricalBanEvent,
@@ -789,13 +793,14 @@ router.get('/ban-waves', withCachePolicy('no-store'), async (req: Request, res: 
       else if (hours <= 168) bucket = 'hour';
       else bucket = 'day';
     }
-    cacheKey = `ban-waves:${hours}:${windowMinutes}:${minNodes}:${bucket}`;
+    const scope = req.query.scope === 'q60' ? 'q60' : 'rolling';
+    cacheKey = `ban-waves:${scope}:${hours}:${windowMinutes}:${minNodes}:${bucket}`;
+    // Capture the bounded fallback before the fresh-cache lookup evicts expiry.
+    staleCached = getAnalyticsStaleCache(cacheKey);
     const cached = getAnalyticsCache(cacheKey);
     if (cached) {
       return res.json(cached);
     }
-    staleCached = getAnalyticsStaleCache(cacheKey);
-
     const existingInFlight = analyticsInFlight.get(cacheKey);
     if (existingInFlight) {
       try {
@@ -803,7 +808,7 @@ router.get('/ban-waves', withCachePolicy('no-store'), async (req: Request, res: 
         return res.json(payload);
       } catch {
         if (staleCached) {
-          return res.json(staleCached);
+          return res.json({ ...staleCached, data: { ...staleCached.data, dataStatus: 'stale' } });
         }
         throw new Error('ban-waves in-flight query failed');
       }
@@ -813,10 +818,25 @@ router.get('/ban-waves', withCachePolicy('no-store'), async (req: Request, res: 
       inFlightResolve = resolve;
       inFlightReject = reject;
     });
+    void inFlightPromise.catch(() => undefined);
     analyticsInFlight.set(cacheKey, inFlightPromise);
     inFlightRegistered = true;
 
-    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const rollingSince = new Date(Date.now() - hours * 60 * 60 * 1000);
+    let activatedAt: Date | null = null;
+    if (scope === 'q60') {
+      const hash = await rpcService.call<string>('getblockhash', [Q60_ACTIVATION_HEIGHT]);
+      const header = await rpcService.call<{ time: number }>('getblockheader', [hash]);
+      if (!Number.isFinite(header.time) || header.time <= 0) {
+        throw new Error('Q60 activation block time unavailable');
+      }
+      activatedAt = new Date(header.time * 1000);
+    }
+    const since = activatedAt && activatedAt > rollingSince ? activatedAt : rollingSince;
+    if (scope === 'q60' && String(req.query.bucket ?? 'auto') === 'auto') {
+      const effectiveHours = (Date.now() - since.getTime()) / 3_600_000;
+      bucket = effectiveHours <= 24 ? '15min' : effectiveHours <= 168 ? 'hour' : 'day';
+    }
     const windowSec = windowMinutes * 60;
 
     // Try to load live nodes for enrichment (country, IP, operator, payout)
@@ -937,28 +957,35 @@ router.get('/ban-waves', withCachePolicy('no-store'), async (req: Request, res: 
     if (eventIps.length > 0) {
       const inventoryRows = await NodeInventory.find(
         { ip: { $in: eventIps } },
-        { ip: 1, walletVersion: 1, protocolVersion: 1, lastObservedAt: 1 }
+        { ip: 1, walletVersion: 1, protocolVersion: 1, lastVersionObservedAt: 1 }
       ).lean();
       for (const row of inventoryRows) {
         const current = inventoryByIp.get(row.ip);
         const currentAt = current?.lastObservedAt ? new Date(current.lastObservedAt).getTime() : 0;
-        const rowAt = row.lastObservedAt ? new Date(row.lastObservedAt).getTime() : 0;
+        const rowAt = row.lastVersionObservedAt ? new Date(row.lastVersionObservedAt).getTime() : 0;
         if (!current || rowAt >= currentAt) {
           inventoryByIp.set(row.ip, {
             walletVersion: row.walletVersion ?? null,
             protocolVersion: row.protocolVersion ?? null,
-            lastObservedAt: row.lastObservedAt ?? null,
+            lastObservedAt: row.lastVersionObservedAt ?? null,
           });
         }
       }
     }
 
+    poseBanHeightEvents = deduplicateBanEvents(poseBanHeightEvents);
+    const unclassifiedEvents = scope === 'q60'
+      ? poseBanHeightEvents.filter((event) => event.poseBanHeight == null).length : 0;
+    if (scope === 'q60') poseBanHeightEvents = selectQ60BanEvents(poseBanHeightEvents);
+    const trackedNodes = summarizeTrackedBanNodes(poseBanHeightEvents).map((row) => {
+      const live = liveByIdentity.get(row.proTxHash || row.nodeId) || liveById.get(row.nodeId);
+      return { ...row, currentStatus: live?.status ?? null, currentPenalty: live?.posePenalty ?? null };
+    });
     const classifiedEvents = classifyHistoricalBanEvents(poseBanHeightEvents, {
       freshSinceMs,
       windowSinceMs: since.getTime(),
     });
     const {
-      freshBanEvents,
       recoveryEvents,
       stillBannedEvents,
       observedAlreadyBannedEvents,
@@ -1075,7 +1102,7 @@ router.get('/ban-waves', withCachePolicy('no-store'), async (req: Request, res: 
       return rows;
     }
 
-    const timeline = buildDropTimeline(freshBanEvents);
+    const timeline = buildDropTimeline(classifiedEvents.confirmedBanEvents);
     const allTrackedTimeline = buildDropTimeline(poseBanHeightEvents);
     const recoveredTimeline = buildRecoveryTimeline(recoveryEvents);
     const stillBannedTimeline = buildDropTimeline(stillBannedEvents);
@@ -1324,6 +1351,16 @@ router.get('/ban-waves', withCachePolicy('no-store'), async (req: Request, res: 
       success: true,
       data: {
         generatedAt: new Date().toISOString(),
+        analysisScope: {
+          kind: scope,
+          from: since.toISOString(),
+          activationHeight: Q60_ACTIVATION_HEIGHT,
+          activatedAt: activatedAt?.toISOString() ?? null,
+          historyLimited: Boolean(activatedAt && rollingSince > activatedAt),
+          unclassifiedEvents,
+        },
+        dataStatus: 'fresh',
+        trackedNodes,
         windowHours: hours,
         windowMinutes,
         minNodes,
@@ -1392,7 +1429,7 @@ router.get('/ban-waves', withCachePolicy('no-store'), async (req: Request, res: 
   } catch (error) {
     (inFlightReject as ((reason?: unknown) => void) | null)?.(error);
     if (staleCached) {
-      return res.json(staleCached);
+      return res.json({ ...staleCached, data: { ...staleCached.data, dataStatus: 'stale' } });
     }
     sendInternalError(res, 'Failed to compute ban waves', error);
   } finally {

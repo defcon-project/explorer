@@ -470,6 +470,7 @@ export const openApiDocument: OpenApiDocument = {
         tags: ['V1', 'Masternodes'],
         summary: 'PoSe ban-wave analysis',
         parameters: [
+          { name: 'scope', in: 'query', description: 'q60 selects confirmed ban blocks at or above mainnet height 144888, within the requested retention window.', schema: { type: 'string', enum: ['rolling', 'q60'], default: 'rolling' } },
           { name: 'hours', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 2160, default: 168 } },
           { name: 'windowMinutes', in: 'query', schema: { type: 'integer', minimum: 5, maximum: 120, default: 30 } },
           { name: 'minNodes', in: 'query', schema: { type: 'integer', minimum: 2, maximum: 50, default: 3 } },

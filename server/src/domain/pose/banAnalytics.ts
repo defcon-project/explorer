@@ -30,6 +30,47 @@ export interface HistoricalBanEvent {
 
 export type BanWaveSeverity = 'low' | 'moderate' | 'high' | 'critical';
 
+export const Q60_ACTIVATION_HEIGHT = 144888;
+
+export function deduplicateBanEvents(events: HistoricalBanEvent[]) {
+  const unique = new Map<string, HistoricalBanEvent>();
+  for (const event of events) {
+    const key = `${banEventIdentity(event)}|${event.poseBanHeight != null ? `height:${event.poseBanHeight}` : `time:${event.at}`}`;
+    const prior = unique.get(key);
+    if (!prior || event.at >= prior.at) unique.set(key, event);
+  }
+  return [...unique.values()].sort((a, b) => a.at - b.at);
+}
+
+/** Use the ban block, never the later discovery height, to assign an era. */
+export function selectQ60BanEvents(events: HistoricalBanEvent[]) {
+  return events.filter((event) =>
+    isConfirmedBanTransition(event) && event.poseBanHeight != null &&
+    event.poseBanHeight >= Q60_ACTIVATION_HEIGHT
+  );
+}
+
+/** One row per identity; duplicate observations of the same ban are not repeats. */
+export function summarizeTrackedBanNodes(events: HistoricalBanEvent[]) {
+  const byIdentity = new Map<string, { latest: HistoricalBanEvent; keys: Set<string> }>();
+  for (const event of events.filter(isConfirmedBanTransition)) {
+    const identity = banEventIdentity(event);
+    const row = byIdentity.get(identity) ?? { latest: event, keys: new Set<string>() };
+    row.keys.add(event.poseBanHeight != null ? `height:${event.poseBanHeight}` : `time:${event.at}`);
+    if (event.at > row.latest.at) row.latest = event;
+    byIdentity.set(identity, row);
+  }
+  return [...byIdentity.values()].map(({ latest, keys }) => ({
+    nodeId: latest.nodeId,
+    proTxHash: latest.proTxHash,
+    service: latest.service,
+    banCount: keys.size,
+    lastBanAt: new Date(latest.at).toISOString(),
+    lastBanHeight: latest.poseBanHeight,
+    recoveredAt: latest.recoveredAt == null ? null : new Date(latest.recoveredAt).toISOString(),
+  })).sort((a, b) => b.banCount - a.banCount || b.lastBanAt.localeCompare(a.lastBanAt));
+}
+
 export interface BanWaveNodeBase {
   ip: string;
   operatorPubkey: string | null;

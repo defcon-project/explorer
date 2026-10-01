@@ -338,12 +338,14 @@ export async function fetchMasternodeEvents(opts: {
 }
 
 export async function fetchBanWaveAnalysis(opts: {
+  scope?: 'rolling' | 'q60';
   hours?: number;
   windowMinutes?: number;
   minNodes?: number;
   bucket?: 'auto' | '15min' | 'hour' | 'day';
 } = {}) {
   const params: Record<string, string | number> = {};
+  if (opts.scope) params.scope = opts.scope;
   if (opts.hours) params.hours = opts.hours;
   if (opts.windowMinutes) params.windowMinutes = opts.windowMinutes;
   if (opts.minNodes) params.minNodes = opts.minNodes;

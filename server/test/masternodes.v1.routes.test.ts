@@ -8,6 +8,7 @@ import masternodesV1Routes from '../src/routes/v1/masternodes.v1.routes';
 import { getEnrichedNodes } from '../src/services/masternode.service';
 import { MasternodeEvent } from '../src/models/MasternodeEvent';
 import { NodeInventory } from '../src/models/NodeInventory';
+import { rpcService } from '../src/services/rpc.service';
 
 vi.mock('../src/services/masternode.service', () => ({
   getEnrichedNodes: vi.fn(),
@@ -161,11 +162,82 @@ describe('masternodes v1 ban wave history', () => {
     expect(wave.stillBannedCount).toBe(2);
     expect(wave.providers).toEqual(['Contabo', 'RackNerd']);
     expect(wave.versions).toEqual(['22.1.2', '22.1.3']);
+    // Inventory membership freshness must never stand in for a version observation.
+    expect(wave.nodes[0].versionObservedAt).toBeNull();
     expect(wave.nodes.map((node: { status: string }) => node.status).sort()).toEqual([
       'recovered',
       'still_banned',
       'still_banned',
     ]);
+  });
+
+  it('separates Q60 history from current state and retains isolated repeated bans', async () => {
+    const now = Date.now();
+    vi.spyOn(rpcService, 'call').mockImplementation(async (method) => {
+      if (method === 'getblockhash') return 'activation-hash' as never;
+      if (method === 'getblockheader') return { time: Math.floor((now - 3_600_000) / 1000) } as never;
+      throw new Error('Unexpected RPC');
+    });
+    vi.mocked(getEnrichedNodes).mockResolvedValue([
+      { id: 'live-a', proTxHash: 'protx-a', status: 'POSE_PENALTY', posePenalty: 112 },
+      { id: 'old-ban', proTxHash: 'old', status: 'POSE_BANNED' },
+    ] as never);
+    const row = { nodeId: 'node-a', proTxHash: 'protx-a', previousStatus: 'POSE_BAN_HEIGHT', detectedAt: new Date(now - 60_000), service: '198.51.100.1:8192' };
+    mockEventFind([
+      { ...row, poseBanHeight: 144887, detectedHeight: 144990 },
+      { ...row, poseBanHeight: 144888 },
+      { ...row, poseBanHeight: 144888 },
+      { ...row, poseBanHeight: 144947, detectedAt: new Date(now - 30_000) },
+      { ...row, poseBanHeight: null, previousStatus: 'ENABLED', detectedHeight: 144990 },
+    ]);
+    mockInventoryFind();
+    const res = await request(app).get('/api/v1/masternodes/ban-waves').query({ scope: 'q60', hours: 2160 });
+    expect(res.status).toBe(200);
+    expect(banWaveAnalysisApiResponseSchema.safeParse(res.body).success).toBe(true);
+    expect(res.body.data.analysisScope).toMatchObject({ kind: 'q60', activationHeight: 144888, unclassifiedEvents: 1, historyLimited: false });
+    expect(res.body.data.currentPoseBanned).toBe(1);
+    expect(res.body.data.trackedNodes).toEqual([expect.objectContaining({ proTxHash: 'protx-a', banCount: 2, lastBanHeight: 144947, currentStatus: 'POSE_PENALTY', currentPenalty: 112 })]);
+    expect(res.body.data.waves).toHaveLength(0);
+    expect(res.body.data.timeline.reduce((sum: number, point: { total: number }) => sum + point.total, 0)).toBe(2);
+    expect(res.body.data.freshDropEvents24h).toBe(2);
+    expect(res.body.data.bucket).toBe('15min');
+  });
+
+  it('does not invent an activation timestamp when Q60 RPC lookup fails', async () => {
+    vi.spyOn(rpcService, 'call').mockRejectedValue(new Error('RPC unavailable'));
+    const res = await request(app).get('/api/v1/masternodes/ban-waves').query({ scope: 'q60', hours: 2159 });
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('shows older confirmed bans in the selected timeline without counting them as fresh 24h', async () => {
+    vi.mocked(getEnrichedNodes).mockResolvedValue([]);
+    mockEventFind([{ nodeId: 'older', proTxHash: 'older', previousStatus: 'POSE_BAN_HEIGHT', poseBanHeight: 144900, detectedAt: new Date(Date.now() - 30 * 3_600_000) }]);
+    mockInventoryFind();
+    const res = await request(app).get('/api/v1/masternodes/ban-waves').query({ hours: 48 });
+    expect(res.status).toBe(200);
+    expect(res.body.data.freshDrops24h).toBe(0);
+    expect(res.body.data.trackedNodes).toHaveLength(1);
+    expect(res.body.data.timeline.reduce((sum: number, point: { total: number }) => sum + point.total, 0)).toBe(1);
+    expect(res.body.data.trackedNodes[0].currentStatus).toBeNull();
+  });
+
+  it('marks stale Q60 history when an expired cached view cannot be refreshed', async () => {
+    const now = Date.now();
+    const rpc = vi.spyOn(rpcService, 'call').mockImplementation(async (method) =>
+      (method === 'getblockhash' ? 'activation-hash' : { time: Math.floor((now - 3_600_000) / 1000) }) as never);
+    vi.mocked(getEnrichedNodes).mockResolvedValue([]);
+    mockEventFind([]);
+    mockInventoryFind();
+    const query = { scope: 'q60', hours: 48 };
+    const first = await request(app).get('/api/v1/masternodes/ban-waves').query(query);
+    expect(first.status).toBe(200);
+    vi.spyOn(Date, 'now').mockReturnValue(now + 180_000);
+    rpc.mockRejectedValue(new Error('RPC unavailable'));
+    const stale = await request(app).get('/api/v1/masternodes/ban-waves').query(query);
+    expect(stale.status).toBe(200);
+    expect(stale.body.data.dataStatus).toBe('stale');
+    expect(stale.body.data.generatedAt).toBe(first.body.data.generatedAt);
   });
 
   it('normalizes stored event timestamps before returning the shared event contract', async () => {

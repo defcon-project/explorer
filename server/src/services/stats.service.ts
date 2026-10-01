@@ -165,13 +165,8 @@ async function tryGetActiveMasternodes(): Promise<number | undefined> {
 
 let cached: { atMs: number; data: StatsData } | null = null;
 let inFlight: Promise<StatsData> | null = null;
+// Refresh by TTL, not on every indexed block, to keep the dashboard cache hot.
 const STATS_TTL_MS = Math.max(30_000, Math.max(0, config.cache.ttlSeconds) * 3000);
-
-export function invalidateStatsCache(): void {
-  // Keep the last stats snapshot hot. It refreshes by TTL and this prevents
-  // every indexed block from turning header/dashboard stats into a cold path.
-  return;
-}
 
 export async function getStatsData(forceRefresh = false): Promise<StatsData> {
   const now = Date.now();

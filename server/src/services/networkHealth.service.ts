@@ -1,3 +1,4 @@
+import { PeriodicTask } from '../utils/periodicTask';
 import { rpcService } from './rpc.service';
 import { logger } from '../utils/logger';
 
@@ -89,7 +90,6 @@ const POLL_INTERVAL_MS = 30_000;
 const BANSCORE_WARN_THRESHOLD = 1;
 const PEER_BEHIND_BLOCKS = 5;
 const MIN_HEALTHY_PEERS = 3;
-const SYNC_PROGRESS_THRESHOLD = 0.9999;
 
 // ── Status computation ───────────────────────────────────────────────────────
 
@@ -130,33 +130,19 @@ function computeStatus(
 
 class NetworkHealthService {
   private report: NetworkHealthReport | null = null;
-  private isRunning = false;
-  private intervalId: ReturnType<typeof setInterval> | null = null;
 
-  async start(): Promise<void> {
-    if (this.isRunning) return;
-    this.isRunning = true;
+  private readonly task = new PeriodicTask({
+    intervalMs: POLL_INTERVAL_MS,
+    run: () => this.poll(),
+    onError: (error) => logger.error('NetworkHealth poll failed; will retry:', error),
+  });
 
-    try {
-      await this.poll();
-    } catch (err) {
-      logger.warn('NetworkHealth: initial poll failed, will retry on next interval:', err);
-    }
-
-    this.intervalId = setInterval(() => {
-      this.poll().catch((err) => logger.error('NetworkHealth poller error:', err));
-    }, POLL_INTERVAL_MS);
-
-    logger.info(`NetworkHealth poller started (${POLL_INTERVAL_MS / 1000}s interval)`);
+  start(): Promise<void> {
+    return this.task.start();
   }
 
   stop(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-    this.isRunning = false;
-    logger.info('NetworkHealth poller stopped');
+    this.task.stop();
   }
 
   getReport(): NetworkHealthReport | null {

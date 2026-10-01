@@ -31,6 +31,7 @@ export const UNKNOWN_PROVIDER = 'Unknown';
 const POSITIVE_TTL_MS = 1000 * 60 * 60 * 24; // 24h
 const NEGATIVE_TTL_MS = 1000 * 60 * 60 * 6; // 6h
 const PTR_TIMEOUT_MS = 1200;
+const PROVIDER_CACHE_LIMIT = 4096;
 const IP_API_BATCH_SIZE = 100; // ip-api.com hard limit
 const IP_API_RATE_LIMIT_PER_MIN = 45;
 const IP_API_BACKOFF_BASE_MS = 30_000;
@@ -172,13 +173,18 @@ function inferFromText(text: string, patterns: ProviderPattern[]): string | null
 // ─── PTR layer ──────────────────────────────────────────────────────────────
 async function reverseLookup(ip: string): Promise<string[]> {
   if (!isIP(ip)) return [];
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       dns.reverse(ip),
-      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), PTR_TIMEOUT_MS)),
+      new Promise<string[]>((resolve) => {
+        timeout = setTimeout(() => resolve([]), PTR_TIMEOUT_MS);
+      }),
     ]);
   } catch {
     return [];
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -358,6 +364,11 @@ function getCached(key: string): ProviderInfo | null {
 
 function setCached(key: string, info: ProviderInfo): void {
   const ttl = info.provider === UNKNOWN_PROVIDER ? NEGATIVE_TTL_MS : POSITIVE_TTL_MS;
+  cache.delete(key);
+  if (cache.size >= PROVIDER_CACHE_LIMIT) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
   cache.set(key, { info, expiresAt: Date.now() + ttl });
 }
 
@@ -462,8 +473,8 @@ export async function bulkResolveProviders(
   }
 
   const stillUnknown = uniqueInputs
-    .filter((i) => !i.isTor && isIP(String(i.host || '').trim()))
-    .map((i) => String(i.host).trim().toLowerCase())
+    .filter((i) => !i.isTor && isIP(i.host))
+    .map((i) => i.host)
     .filter((h) => {
       const info = out.get(h);
       return info && info.provider === UNKNOWN_PROVIDER;
@@ -471,10 +482,9 @@ export async function bulkResolveProviders(
 
   if (stillUnknown.length === 0) return out;
 
-  const uniq = Array.from(new Set(stillUnknown));
   const maxBatches = config.providerLookup.ipApiMaxBatchPerCycle;
-  for (let b = 0; b < maxBatches && b * IP_API_BATCH_SIZE < uniq.length; b++) {
-    const slice = uniq.slice(b * IP_API_BATCH_SIZE, (b + 1) * IP_API_BATCH_SIZE);
+  for (let b = 0; b < maxBatches && b * IP_API_BATCH_SIZE < stillUnknown.length; b++) {
+    const slice = stillUnknown.slice(b * IP_API_BATCH_SIZE, (b + 1) * IP_API_BATCH_SIZE);
     const result = await ipApiBatch(slice);
     if (result.size === 0) break; // rate-limited or failed; stop trying this cycle
     for (const [ip, asnInfo] of result) {

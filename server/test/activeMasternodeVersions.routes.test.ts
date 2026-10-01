@@ -1,3 +1,4 @@
+import { getActiveMasternodeVersions } from '../src/services/masternodeVersions.service';
 import express from 'express';
 import request from 'supertest';
 import { activeMasternodeVersionsApiResponseSchema } from '@defcon/shared/dist/contracts';
@@ -39,6 +40,17 @@ function version(id: string, walletVersion: string | null, ageHours = 0, extra =
 describe('active masternode versions', () => {
   beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(now.getTime()); });
   afterEach(() => { vi.restoreAllMocks(); });
+
+  it('shares concurrent snapshots without caching subsequent requests', async () => {
+    snapshot([node('1')]);
+    inventory([version('1', '23.0.0')]);
+    const results = await Promise.all(Array.from({ length: 20 }, () => getActiveMasternodeVersions()));
+    expect(NodeInventory.find).toHaveBeenCalledTimes(1);
+    expect(getEnrichedPayload).toHaveBeenCalledTimes(1);
+    expect(results.every((result) => result === results[0])).toBe(true);
+    await getActiveMasternodeVersions();
+    expect(NodeInventory.find).toHaveBeenCalledTimes(2);
+  });
 
   it('counts ENABLED plus POSE_PENALTY, excludes inactive and historical nodes, and keeps unknown versions in the denominator', async () => {
     snapshot([node('1'), node('2', 'POSE_PENALTY'), node('3'), node('4'),

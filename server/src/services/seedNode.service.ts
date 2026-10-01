@@ -1,3 +1,4 @@
+import { PeriodicTask } from '../utils/periodicTask';
 import axios from 'axios';
 import { logger } from '../utils/logger';
 
@@ -147,32 +148,20 @@ export interface SeedNodeStatus {
 
 class SeedNodeService {
   private report: SeedNodeStatus[] = [];
-  private isRunning = false;
-  private intervalId: ReturnType<typeof setInterval> | null = null;
 
-  async start(): Promise<void> {
-    if (this.isRunning) return;
-    this.isRunning = true;
-    // Small delay so networkHealthService can complete its initial poll first
-    await new Promise<void>((resolve) => setTimeout(resolve, 5_000));
-    try {
-      await this.poll();
-    } catch (err) {
-      logger.warn('SeedNode: initial poll failed, will retry:', err);
-    }
-    this.intervalId = setInterval(() => {
-      this.poll().catch((err) => logger.error('SeedNode poller error:', err));
-    }, POLL_INTERVAL_MS);
-    logger.info(`SeedNode poller started (${POLL_INTERVAL_MS / 1000}s interval)`);
+  private readonly task = new PeriodicTask({
+    intervalMs: POLL_INTERVAL_MS,
+    startupDelayMs: 5_000,
+    run: () => this.poll(),
+    onError: (error) => logger.error('SeedNode poll failed; will retry:', error),
+  });
+
+  start(): Promise<void> {
+    return this.task.start();
   }
 
   stop(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-    this.isRunning = false;
-    logger.info('SeedNode poller stopped');
+    this.task.stop();
   }
 
   getReport(): SeedNodeStatus[] {

@@ -1,4 +1,5 @@
 import type { ActiveMasternodeVersionsContract } from '@defcon/shared';
+import { createSingleFlight } from '../utils/singleFlight';
 import { config } from '../config';
 import { isActiveMasternodeStatus } from '../domain/pose/banAnalytics';
 import { NodeInventory } from '../models/NodeInventory';
@@ -19,7 +20,13 @@ function iso(value: Date | null | undefined): string | null {
   return value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toISOString() : null;
 }
 
-export async function getActiveMasternodeVersions(): Promise<ActiveMasternodeVersionsContract> {
+const activeVersionsFlight = createSingleFlight<ActiveMasternodeVersionsContract>();
+
+export function getActiveMasternodeVersions(): Promise<ActiveMasternodeVersionsContract> {
+  return activeVersionsFlight.run(buildActiveMasternodeVersions);
+}
+
+async function buildActiveMasternodeVersions(): Promise<ActiveMasternodeVersionsContract> {
   // Membership comes from the daemon snapshot, never the historical inventory.
   const snapshot = await getEnrichedPayload();
   // The legacy RPC adapter also returns [] after all RPC fallbacks fail. Do not
@@ -57,30 +64,29 @@ export async function getActiveMasternodeVersions(): Promise<ActiveMasternodeVer
       isDeprecated: walletVersion != null && isDeprecated(walletVersion, requiredVersion),
     };
   }).sort((a, b) => (a.ip || a.id).localeCompare(b.ip || b.id, undefined, { numeric: true }) || a.id.localeCompare(b.id));
-  const fresh = nodes.filter((node) => node.versionState === 'fresh');
-  const identified = nodes.filter((node) => node.walletVersion != null);
+  const summary: ActiveMasternodeVersionsContract['summary'] = {
+    total: nodes.length, enabled: 0, posePenalty: 0, fresh: 0, stale: 0, unknown: 0,
+    coveragePct: 0, recommended: 0, deprecated: 0,
+  };
   const counts = new Map<string, number>();
   // Age describes evidence quality, not active membership or version identity.
-  // Retain older observations in their last-known version bucket.
-  for (const node of identified) counts.set(node.walletVersion!, (counts.get(node.walletVersion!) ?? 0) + 1);
+  for (const node of nodes) {
+    summary[node.status === 'ENABLED' ? 'enabled' : 'posePenalty'] += 1;
+    summary[node.versionState] += 1;
+    if (node.walletVersion != null) {
+      summary[node.isDeprecated ? 'deprecated' : 'recommended'] += 1;
+      counts.set(node.walletVersion, (counts.get(node.walletVersion) ?? 0) + 1);
+    }
+  }
   const percentage = (count: number) => nodes.length > 0 ? Math.round(count / nodes.length * 10_000) / 100 : 0;
+  summary.coveragePct = percentage(summary.fresh);
   return {
     generatedAt: new Date(now).toISOString(),
     statusObservedAt: snapshot.observedAt,
     inventoryPollSeconds: config.nodeInventory.pollIntervalMs / 1000,
     versionMaxAgeSeconds: VERSION_MAX_AGE_MS / 1000,
     requiredVersion,
-    summary: {
-      total: nodes.length,
-      enabled: nodes.filter((node) => node.status === 'ENABLED').length,
-      posePenalty: nodes.filter((node) => node.status === 'POSE_PENALTY').length,
-      fresh: fresh.length,
-      stale: nodes.filter((node) => node.versionState === 'stale').length,
-      unknown: nodes.filter((node) => node.versionState === 'unknown').length,
-      coveragePct: percentage(fresh.length),
-      recommended: identified.filter((node) => !node.isDeprecated).length,
-      deprecated: identified.filter((node) => node.isDeprecated).length,
-    },
+    summary,
     versions: [...counts].map(([version, count]) => ({
       version, count, sharePct: percentage(count), isDeprecated: isDeprecated(version, requiredVersion),
     })).sort((a, b) => b.count - a.count || a.version.localeCompare(b.version)),

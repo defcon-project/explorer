@@ -1,3 +1,4 @@
+import { PeriodicTask } from '../utils/periodicTask';
 import { MasternodeEvent } from '../models/MasternodeEvent';
 import { fetchRawMasternodes as fetchMasternodeStatusSnapshot, getEnrichedNodes } from './masternode.service';
 import { config } from '../config';
@@ -13,37 +14,21 @@ function eventIdentity(node: Pick<EnrichedSnapshotNode, 'id' | 'proTxHash'>): st
 }
 
 class MasternodePollerService {
-  private isRunning = false;
-  private intervalId: ReturnType<typeof setInterval> | null = null;
   private lastSnapshot = new Map<string, string>(); // nodeId -> status
   private hasBaseline = false;
 
-  async start(): Promise<void> {
-    if (this.isRunning) return;
-    this.isRunning = true;
+  private readonly task = new PeriodicTask({
+    intervalMs: POLL_INTERVAL_MS,
+    run: () => this.poll(),
+    onError: (error) => logger.error('Masternode poller poll failed; will retry:', error),
+  });
 
-    // Initial baseline poll (silent for status-change events, but historical ban
-    // events are still upserted append-only from PoSeBanHeight).
-    try {
-      await this.poll();
-    } catch (err) {
-      logger.warn('Masternode poller: initial baseline failed, will retry on next interval:', err);
-    }
-
-    this.intervalId = setInterval(() => {
-      this.poll().catch((err) => logger.error('Masternode poller error:', err));
-    }, POLL_INTERVAL_MS);
-
-    logger.info(`Masternode poller started (${POLL_INTERVAL_MS / 1000}s interval)`);
+  start(): Promise<void> {
+    return this.task.start();
   }
 
-  async stop(): Promise<void> {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-    this.isRunning = false;
-    logger.info('Masternode poller stopped');
+  stop(): void {
+    this.task.stop();
   }
 
   private async recordHistoricalBanEvents(): Promise<void> {

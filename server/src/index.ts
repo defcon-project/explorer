@@ -458,6 +458,8 @@ async function start() {
 async function stopServices(): Promise<void> {
   telegramService.stop();
   cachePrewarmService.stop();
+  networkHealthService.stop();
+  seedNodeService.stop();
   await Promise.all([
     syncService.stop(),
     masternodePollerService.stop(),

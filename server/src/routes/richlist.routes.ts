@@ -24,6 +24,7 @@ const RICHLIST_PROJECTION = {
 const BALANCE_ONLY_PROJECTION = {
   balanceSat: 1,
 };
+const RICHLIST_CACHE_LIMIT = 128;
 const RICHLIST_TTL_MS = Math.max(20_000, Math.min(60_000, config.cache.ttlSeconds * 2000));
 const DISTRIBUTION_TTL_MS = Math.max(30_000, Math.min(120_000, config.cache.ttlSeconds * 4000));
 const RICHLIST_STALE_MAX_MS = Math.max(RICHLIST_TTL_MS * 3, 90_000);
@@ -169,6 +170,11 @@ router.get('/', withCachePolicy('short'), async (req: Request, res: Response) =>
       const total = facetResult?.countRows[0]?.total ?? 0;
       const ranked = buildRanked(addresses, skip);
       const entry: RichlistCachedPage = { atMs: Date.now(), data: ranked, total };
+      richlistCache.delete(cacheKey);
+      if (richlistCache.size >= RICHLIST_CACHE_LIMIT) {
+        const oldest = richlistCache.keys().next().value;
+        if (oldest !== undefined) richlistCache.delete(oldest);
+      }
       richlistCache.set(cacheKey, entry);
       return entry;
     })();

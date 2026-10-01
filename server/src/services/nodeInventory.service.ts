@@ -1,9 +1,10 @@
+import { PeriodicTask } from '../utils/periodicTask';
 import axios from 'axios';
 import { isIP } from 'node:net';
 import { config } from '../config';
 import { NodeInventory } from '../models/NodeInventory';
 import { NodeInventoryEvent } from '../models/NodeInventoryEvent';
-import { getEnrichedNodes, parseService } from './masternode.service';
+import { getEnrichedNodes } from './masternode.service';
 import { rpcService } from './rpc.service';
 import { seedNodeService } from './seedNode.service';
 import { logger } from '../utils/logger';
@@ -185,26 +186,21 @@ async function fetchFeed(url: string, apiKey = ''): Promise<unknown> {
 }
 
 class NodeInventoryService {
-  private isRunning = false;
-  private intervalId: ReturnType<typeof setInterval> | null = null;
   private inFlight: Promise<void> | null = null;
 
-  async start(): Promise<void> {
-    if (this.isRunning) return;
-    this.isRunning = true;
-    // Let the seed-node and network-health snapshots establish their initial baseline first.
-    await new Promise<void>((resolve) => setTimeout(resolve, 15_000));
-    await this.poll();
-    this.intervalId = setInterval(() => {
-      this.poll().catch((error) => logger.error('Node inventory scanner failed:', error));
-    }, config.nodeInventory.pollIntervalMs);
-    logger.info(`Node inventory scanner started (${config.nodeInventory.pollIntervalMs / 1000}s interval)`);
+  private readonly task = new PeriodicTask({
+    intervalMs: config.nodeInventory.pollIntervalMs,
+    startupDelayMs: 15_000,
+    run: () => this.poll(),
+    onError: (error) => logger.error('Node inventory scanner poll failed; will retry:', error),
+  });
+
+  start(): Promise<void> {
+    return this.task.start();
   }
 
   stop(): void {
-    if (this.intervalId) clearInterval(this.intervalId);
-    this.intervalId = null;
-    this.isRunning = false;
+    this.task.stop();
   }
 
   async poll(): Promise<void> {

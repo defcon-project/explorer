@@ -2,7 +2,6 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { rpcService } from './rpc.service';
 import { invalidateChainTip } from './chainTip.service';
-import { invalidateStatsCache } from './stats.service';
 import { invalidateDashboardCache } from '../routes/dashboard.routes';
 import { invalidateRichlistCache } from '../routes/richlist.routes';
 import { Block } from '../models/Block';
@@ -45,18 +44,6 @@ interface StoredVin {
   sequence: number;
   valueSat?: mongoose.Types.Decimal128;
   address?: string;
-}
-
-interface StoredVout {
-  valueSat: mongoose.Types.Decimal128;
-  n: number;
-  scriptPubKey: {
-    asm: string;
-    hex: string;
-    reqSigs?: number;
-    type: string;
-    addresses?: string[];
-  };
 }
 
 interface ProcessedBlockSummary {
@@ -736,7 +723,6 @@ class SyncService {
         lastHash = processedBlock.hash;
         lastKnownSyncedHeight = currentHeight;
         invalidateChainTip();
-        invalidateStatsCache();
         invalidateDashboardCache();
         invalidateRichlistCache();
 

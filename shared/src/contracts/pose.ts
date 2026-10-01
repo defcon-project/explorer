@@ -225,6 +225,26 @@ export const banWaveTimelinePointSchema = z.object({
 });
 
 export const banWaveAnalysisSchema = z.object({
+  analysisScope: z.object({
+    kind: z.enum(['rolling', 'q60']),
+    from: isoDateTime,
+    activationHeight: nonNegativeInteger,
+    activatedAt: isoDateTime.nullable(),
+    historyLimited: z.boolean(),
+    unclassifiedEvents: nonNegativeInteger,
+  }).optional(),
+  dataStatus: z.enum(['fresh', 'stale']).optional(),
+  trackedNodes: z.array(z.object({
+    nodeId: z.string(),
+    proTxHash: nullableText,
+    service: z.string(),
+    banCount: nonNegativeInteger,
+    lastBanAt: isoDateTime,
+    lastBanHeight: nullableInteger,
+    recoveredAt: isoDateTime.nullable(),
+    currentStatus: nullableText,
+    currentPenalty: nullableInteger,
+  })).optional(),
   generatedAt: isoDateTime,
   windowHours: nonNegativeInteger.positive(),
   windowMinutes: nonNegativeInteger.positive(),

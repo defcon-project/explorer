@@ -20,6 +20,7 @@ import {
   Tooltip,
   Legend,
   ReferenceArea,
+  ReferenceLine,
 } from 'recharts';
 import { fetchBanWaveAnalysis } from '../services/api';
 import { useChartAnimation } from '../utils/chartAnimation';
@@ -30,10 +31,11 @@ import './PageStyles.css';
 import './MasternodeHealthPage.css';
 import './BanDetectionPage.css';
 
-type WindowKey = '24h' | '7d' | '30d' | '90d';
+type WindowKey = 'q60' | '24h' | '7d' | '30d' | '90d';
 type TimelineMode = 'fresh' | 'recovered' | 'still' | 'all';
 
 const WINDOW_OPTIONS: { key: WindowKey; label: string; hours: number }[] = [
+  { key: 'q60', label: 'Since Q60', hours: 2160 },
   { key: '24h', label: '24h', hours: 24 },
   { key: '7d', label: '7 days', hours: 168 },
   { key: '30d', label: '30 days', hours: 720 },
@@ -92,7 +94,7 @@ function humanDuration(sec: number | null): string {
 }
 
 function timelineModeDescription(mode: TimelineMode): string {
-  if (mode === 'fresh') return 'Actual new PoSe bans in the last 24h by PoSeBanHeight block time';
+  if (mode === 'fresh') return 'Confirmed ban events in the selected period';
   if (mode === 'recovered') return 'Recovery events for previously detected drops; historical bans remain visible';
   if (mode === 'still') return 'Historical drop events whose nodes are still currently POSE_BANNED';
   return 'All historical drop events plus recovery markers; not just current state';
@@ -105,26 +107,36 @@ function waveNodeStatusLabel(status?: string): string {
 }
 
 export function BanDetectionPage() {
-  const [windowKey, setWindowKey] = useState<WindowKey>('30d');
-  const windowMinutes = 30;
-  const minNodes = 3;
+  const [windowKey, setWindowKey] = useState<WindowKey>('q60');
+  const [windowMinutes, setWindowMinutes] = useState(30);
+  const [minNodes, setMinNodes] = useState(3);
   const [timelineMode, setTimelineMode] = useState<TimelineMode>('fresh');
   const [paused, setPaused] = useState<boolean>(false);
+  const [focusChart, setFocusChart] = useState(false);
+  const [nodeFilter, setNodeFilter] = useState('');
+  const [repeatsOnly, setRepeatsOnly] = useState(true);
   const isPageVisible = usePageVisibility();
   const chartAnimation = useChartAnimation();
 
   const win = WINDOW_OPTIONS.find((w) => w.key === windowKey) ?? WINDOW_OPTIONS[1];
 
-  const { data, isLoading, isFetching, refetch } = useQuery<BanWaveAnalysisView>({
-    queryKey: ['ban-waves', win.hours, windowMinutes, minNodes],
-    queryFn: () => fetchBanWaveAnalysis({ hours: win.hours, windowMinutes, minNodes }),
+  const { data: response, isError, isLoading, isFetching, refetch } = useQuery<BanWaveAnalysisView>({
+    queryKey: ['ban-waves', windowKey, win.hours, windowMinutes, minNodes],
+    queryFn: () => fetchBanWaveAnalysis({ hours: win.hours, windowMinutes, minNodes, scope: windowKey === 'q60' ? 'q60' : 'rolling' }),
     refetchInterval: paused || !isPageVisible ? false : 90_000,
     staleTime: 45_000,
   });
+  const data = isError ? undefined : response;
+  const trackedNodes = data?.trackedNodes ?? [];
+  const visibleNodes = trackedNodes.filter((node) => (!repeatsOnly || node.banCount > 1) &&
+    `${node.nodeId} ${node.proTxHash ?? ''} ${node.service}`.toLowerCase().includes(nodeFilter.toLowerCase()));
+  const periodLabel = windowKey === 'q60' ? 'Since Q60 activation' : `Selected period: ${win.label}`;
+  const eventCount = trackedNodes.reduce((sum, node) => sum + node.banCount, 0);
 
   const timelineChartData = useMemo(() => {
     if (!data) return [];
     const timeline = data.timelineModes?.[timelineMode] ?? data.timeline;
+    if (!focusChart) return timeline;
     if (timeline.length === 0) return [];
     const firstActive = timeline.findIndex((point) => point.waveBans > 0 || point.isolatedBans > 0 || (point.recovered ?? 0) > 0 || (point.stillBanned ?? 0) > 0);
     if (firstActive < 0) return timeline;
@@ -140,7 +152,7 @@ export function BanDetectionPage() {
     const start = Math.max(0, firstActive - padding);
     const end = Math.min(timeline.length - 1, lastActive + padding);
     return timeline.slice(start, end + 1);
-  }, [data, timelineMode]);
+  }, [data, timelineMode, focusChart]);
 
   const waveBands = useMemo(() => {
     if (!data || timelineChartData.length === 0) return [] as Array<{
@@ -216,9 +228,13 @@ export function BanDetectionPage() {
   }, [data, timelineChartData]);
 
   const timelineFocused = Boolean(data && timelineChartData.length > 0 && timelineChartData.length < data.timeline.length);
+  const activationMs = data?.analysisScope?.activatedAt ? Date.parse(data.analysisScope.activatedAt) : null;
+  const bucketDurationMs = data?.bucket === 'day' ? 86_400_000 : data?.bucket === 'hour' ? 3_600_000 : 900_000;
+  const activationBucket = activationMs == null ? undefined : timelineChartData.find((point) =>
+    point.timestamp * 1000 <= activationMs && point.timestamp * 1000 + bucketDurationMs > activationMs)?.bucket;
 
   return (
-    <div className="page-container">
+    <div className="page-container bd-page">
       <section className="bd-hero-card">
         <header className="bd-hero-header">
           <div className="bd-hero-copy">
@@ -228,8 +244,8 @@ export function BanDetectionPage() {
             Ban Detection
           </h1>
           <p className="page-subtitle">
-            Coordinated PoSe ban events on the DeFCoN masternode network - detect mass-ban
-            waves, geographic concentration and severity over time.
+            Current masternode state and confirmed PoSe ban history. Compare events after
+            the Q60 consensus activation at block 144888 with earlier periods.
           </p>
         </div>
         <div className="bd-header-controls">
@@ -253,6 +269,7 @@ export function BanDetectionPage() {
               onClick={() => refetch()}
               disabled={isFetching}
               title="Refresh now"
+              aria-label="Refresh"
             >
               <HiOutlineArrowPath className={isFetching ? 'spin' : ''} />
               <span>Refresh</span>
@@ -262,39 +279,60 @@ export function BanDetectionPage() {
               className={`bd-icon-btn ${paused ? 'active' : ''}`}
               onClick={() => setPaused((p) => !p)}
               title={paused ? 'Auto-refresh paused' : 'Pause auto-refresh'}
+              aria-label={paused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
             >
               <span>{paused ? 'Resume' : 'Pause'}</span>
             </button>
           </div>
         </div>
         </header>
+        <div className="bd-monitor-status" role="status">
+          {isError ? 'Ban analysis unavailable. Refresh to retry.' : isLoading ? 'Loading ban analysis…' : data ? <>
+            Updated {new Date(data.generatedAt).toLocaleString()} · {paused ? 'Auto-refresh paused' : 'Refresh every 90s while visible'}
+            {' · '}{data.rpcAvailable ? 'Live RPC available' : 'Live RPC unavailable — current counts unknown'}
+            {data.dataStatus === 'stale' && ' · Cached historical data — refresh failed'}
+          </> : 'No data available'}
+        </div>
+        {data?.analysisScope && <p className="mnh-panel-sub">
+          {periodLabel} · History from {new Date(data.analysisScope.from).toLocaleString()}
+          {data.analysisScope.historyLimited && ' · Limited to the retained history window'}
+          {data.analysisScope.unclassifiedEvents > 0 && ` · ${data.analysisScope.unclassifiedEvents} events excluded: ban block unknown`}
+        </p>}
       </section>
 
       {/* KPI strip */}
+      <h2 className="mnh-panel-title bd-section-title">Current registered masternodes</h2>
+      <section className="mnh-stats-grid bd-current-stats">
+        <KPI icon={<HiOutlineGlobeAlt />} label="Registered" value={data?.rpcAvailable && data.dataStatus !== 'stale' ? formatNumber(data.registeredTotal) : 'Unknown'} sub="Current daemon snapshot" />
+        <KPI icon={<HiOutlineBolt />} label="Active" value={data?.rpcAvailable && data.dataStatus !== 'stale' ? formatNumber(data.currentValid) : 'Unknown'} sub="ENABLED + POSE_PENALTY" />
+        <KPI icon={<HiOutlineFire />} label="Currently banned" value={data?.rpcAvailable && data.dataStatus !== 'stale' ? formatNumber(data.currentPoseBanned) : 'Unknown'} sub="Includes bans from earlier periods" />
+        <KPI icon={<HiOutlineExclamationTriangle />} label="Active with penalty" value={data?.rpcAvailable && data.dataStatus !== 'stale' ? formatNumber(data.currentPosePenalty) : 'Unknown'} sub="Already included in Active" />
+      </section>
+      <h2 className="mnh-panel-title bd-section-title">{periodLabel}</h2>
       <section className="mnh-stats-grid">
         <KPI
           icon={<HiOutlineBolt />}
-          label="Fresh drops 24h"
-          value={data ? formatNumber(data.freshDrops24h ?? data.kpis.freshDrops24h ?? data.eventBreakdown?.uniqueFreshNodes ?? 0) : '-'}
-          sub="Actual new PoSe bans in the last 24h"
+          label="Affected nodes"
+          value={data ? formatNumber(trackedNodes.length) : '-'}
+          sub={data ? `${formatNumber(eventCount)} distinct ban events` : ''}
         />
         <KPI
           icon={<HiOutlineFire />}
-          label="Detected waves 24h"
-          value={data ? formatNumber(data.kpis.waveCount) : '-'}
-          sub={`fresh drops >=${minNodes} nodes / ${windowMinutes}m`}
+          label="Detected waves"
+          value={data ? formatNumber(data.kpis.windowWaveCount) : '-'}
+          sub={`At least ${minNodes} unique nodes / ${windowMinutes}m`}
         />
         <KPI
           icon={<HiOutlineExclamationTriangle />}
-          label="Largest wave 24h"
-          value={data ? `${data.kpis.largestWave} nodes` : '-'}
-          sub={data ? `${formatNumber(data.kpis.nodesInWaves)} fresh drops in waves` : ''}
+          label="Largest wave"
+          value={data ? `${data.kpis.windowLargestWave} nodes` : '-'}
+          sub="Within the selected period"
         />
         <KPI
           icon={<HiOutlineGlobeAlt />}
-          label="Countries hit"
-          value={data ? formatNumber(data.kpis.uniqueCountries) : '-'}
-          sub={`${data ? formatNumber(data.eventBreakdown?.uniqueFreshNodes ?? data.kpis.uniqueBannedNodes) : '-'} unique fresh nodes`}
+          label="Repeatedly banned"
+          value={data ? formatNumber(trackedNodes.filter((node) => node.banCount > 1).length) : '-'}
+          sub="Two or more distinct ban blocks"
         />
         <KPI
           icon={<HiOutlineClock />}
@@ -306,6 +344,20 @@ export function BanDetectionPage() {
 
       {/* Timeline ComposedChart */}
       <section className="mnh-panel">
+        <div className="bd-analysis-controls">
+          <label>Wave window
+            <select value={windowMinutes} onChange={(event) => setWindowMinutes(Number(event.target.value))}>
+              {[15, 30, 60, 120].map((value) => <option key={value} value={value}>{value} minutes</option>)}
+            </select>
+          </label>
+          <label>Minimum nodes
+            <select value={minNodes} onChange={(event) => setMinNodes(Number(event.target.value))}>
+              {[2, 3, 5, 10, 15].map((value) => <option key={value} value={value}>{value} nodes</option>)}
+            </select>
+          </label>
+          <label className="bd-check"><input type="checkbox" checked={focusChart} onChange={(event) => setFocusChart(event.target.checked)} /> Focus on events</label>
+          <Link to="/devtools/network-noise">Network noise telemetry</Link>
+        </div>
         <div className="mnh-panel-header">
           <h2 className="mnh-panel-title">
             <HiOutlineClock /> Drop event history
@@ -323,7 +375,7 @@ export function BanDetectionPage() {
                 className={`bd-chip-btn ${timelineMode === 'fresh' ? 'active' : ''}`}
                 onClick={() => setTimelineMode('fresh')}
               >
-                Fresh drops
+                Ban events
               </button>
               <button
                 type="button"
@@ -355,25 +407,7 @@ export function BanDetectionPage() {
             </div>
           </div>
         </div>
-        {data?.eventBreakdown && (
-          <div className="bd-event-breakdown">
-            <span title="Actual new PoSe bans in the last 24h by PoSeBanHeight block time.">
-              Fresh 24h: {formatNumber(data.freshDrops24h ?? data.kpis.freshDrops24h ?? data.eventBreakdown.freshBans)}
-            </span>
-            <span title="Current registered masternodes with PoSeBanHeight != -1.">
-              Current POSE_BANNED: {formatNumber(data.currentPoseBanned ?? data.kpis.currentPoseBanned ?? 0)}
-            </span>
-            <span title="Current registered masternodes receiving PoSe penalty points but not banned.">
-              Current POSE_PENALTY: {formatNumber(data.currentPosePenalty ?? data.kpis.currentPosePenalty ?? 0)}
-            </span>
-            <span title="Current valid masternodes: ENABLED plus POSE_PENALTY.">
-              Valid MNs: {formatNumber(data.currentValid ?? data.kpis.currentValid ?? 0)}
-            </span>
-            <span title="Total registered masternodes in the live snapshot.">
-              Registered MNs: {formatNumber(data.registeredTotal ?? data.kpis.registeredTotal ?? 0)}
-            </span>
-          </div>
-        )}
+        <p className="mnh-panel-sub">Times on this chart are UTC. Counts represent events; one node can be banned more than once. An empty interval means no recorded events.</p>
         <div style={{ width: '100%', height: 360 }}>
           {data && timelineChartData.length > 0 && (
             <ResponsiveContainer>
@@ -414,6 +448,10 @@ export function BanDetectionPage() {
                   labelFormatter={(b) => formatBucket(String(b), data.bucket)}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
+                {activationBucket && <ReferenceLine
+                  yAxisId="left" x={activationBucket} stroke="#2f8fff" strokeDasharray="4 4"
+                  label={{ value: 'Q60 · 144888', position: 'insideTopLeft', fill: '#2f8fff', fontSize: 11 }}
+                />}
                 {waveBands.map((band, idx) => (
                   <ReferenceArea
                     key={`${band.x1}-${band.x2}-${idx}`}
@@ -490,6 +528,33 @@ export function BanDetectionPage() {
         </div>
       </section>
 
+      <section className="mnh-panel bd-node-panel">
+        <div className="mnh-panel-header">
+          <h2 className="mnh-panel-title">{repeatsOnly ? 'Repeatedly banned nodes' : 'All affected nodes'}</h2>
+          <span className="mnh-panel-sub">{periodLabel} · Most repeats first</span>
+        </div>
+        <div className="bd-analysis-controls">
+          <label>Find node<input type="search" placeholder="Service IP or node identity" value={nodeFilter} onChange={(event) => setNodeFilter(event.target.value)} /></label>
+          <label className="bd-check"><input type="checkbox" checked={repeatsOnly} onChange={(event) => setRepeatsOnly(event.target.checked)} /> Repeated bans only</label>
+        </div>
+        <p className="mnh-panel-sub">Distinct ban blocks per masternode identity, including isolated bans. Current state is independent of historical recovery.</p>
+        <div className="mnh-table-wrap">
+          <table className="mnh-table">
+            <thead><tr><th>Node / Service</th><th>Ban events</th><th>Last ban block</th><th>Last event</th><th>Recorded recovery</th><th>Current state</th><th>Penalty</th></tr></thead>
+            <tbody>{visibleNodes.map((node) => <tr key={node.proTxHash || node.nodeId}>
+              <td className="mnh-mono"><div>{node.service || 'Unknown service'}</div><div title={node.proTxHash || node.nodeId} className="mnh-meta-line">{truncateHash(node.proTxHash || node.nodeId, 8)}</div></td>
+              <td>{node.banCount}</td>
+              <td>{node.lastBanHeight != null ? <Link to={`/block/${node.lastBanHeight}`}>{formatNumber(node.lastBanHeight)}</Link> : 'Unknown'}</td>
+              <td>{new Date(node.lastBanAt).toLocaleString()}</td>
+              <td>{node.recoveredAt ? new Date(node.recoveredAt).toLocaleString() : 'Not recorded'}</td>
+              <td>{data?.rpcAvailable && data.dataStatus !== 'stale' ? node.currentStatus ?? 'Unknown / not registered' : 'Unknown'}</td>
+              <td>{data?.rpcAvailable && data.dataStatus !== 'stale' ? node.currentPenalty ?? 'Unknown' : 'Unknown'}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {visibleNodes.length === 0 && <div className="mnh-empty">{isLoading ? 'Loading…' : !data ? 'Node history unavailable.' : repeatsOnly ? 'No repeated bans match this period and search. Uncheck “Repeated bans only” to view isolated events.' : 'No confirmed bans match this period and search.'}</div>}
+      </section>
+
       {/* Wave list */}
       <section className="mnh-panel">
         <div className="mnh-panel-header">
@@ -497,7 +562,7 @@ export function BanDetectionPage() {
             <HiOutlineFire /> Detected Waves ({data?.waves.length ?? 0})
           </h2>
           <span className="mnh-panel-sub">
-            Newest first | severity score = nodes x IP/operator concentration x speed
+            {periodLabel} · Newest first · Severity combines affected nodes, concentration and speed. Correlation does not establish cause.
           </span>
         </div>
 
@@ -505,7 +570,7 @@ export function BanDetectionPage() {
           <div className="mnh-empty" style={{ padding: '2rem' }}>
             {isLoading
               ? 'Loading...'
-              : 'No wave matched the current thresholds. Try lowering "Min nodes" or widening the wave window.'}
+              : !data ? 'Wave history unavailable.' : 'No wave matched the current thresholds. Adjust Minimum nodes or Wave window above; isolated bans remain in All affected nodes.'}
           </div>
         )}
 
@@ -577,6 +642,7 @@ function WaveCard({ wave }: { wave: BanWaveDetail }) {
               <thead>
                 <tr>
                   <th>Detected</th>
+                  <th>Ban block</th>
                   <th>Recovered</th>
                   <th>Status</th>
                   <th>Node</th>
@@ -594,6 +660,7 @@ function WaveCard({ wave }: { wave: BanWaveDetail }) {
                     <td className="mnh-mono" title={n.detectedAt || n.atIso}>
                       {new Date(n.detectedAt || n.atIso).toLocaleString()}
                     </td>
+                    <td>{n.poseBanHeight != null ? <Link to={`/block/${n.poseBanHeight}`}>{formatNumber(n.poseBanHeight)}</Link> : 'Unknown'}</td>
                     <td className="mnh-mono" title={n.recoveredAt || undefined}>
                       {n.recoveredAt ? new Date(n.recoveredAt).toLocaleString() : 'not recovered yet'}
                     </td>
@@ -614,8 +681,9 @@ function WaveCard({ wave }: { wave: BanWaveDetail }) {
                         {n.walletVersion || (typeof n.protocolVersion === 'number' ? `protocol ${n.protocolVersion}` : 'not observed')}
                       </span>
                       {n.versionObservedAt && (
-                        <div className="mnh-meta-line">seen {new Date(n.versionObservedAt).toLocaleString()}</div>
+                        <div className="mnh-meta-line">Last observed {new Date(n.versionObservedAt).toLocaleString()}{new Date(n.versionObservedAt).getTime() > new Date(n.atIso).getTime() ? ' · after this event' : ''}</div>
                       )}
+                      <div className="mnh-meta-line">Last-known version; not proof of ban cause</div>
                     </td>
                     <td>
                       {n.countryCode !== 'UNK' ? n.countryCode : '-'}

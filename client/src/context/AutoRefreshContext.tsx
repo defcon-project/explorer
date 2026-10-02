@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useQueryClient } from '@tanstack/react-query';
 import { AUTO_REFRESH_MS } from '../queryClient';
 import { usePageVisibility } from '../hooks/usePageVisibility';
+import { createRefreshQueue, type RefreshKeys } from '../utils/refreshQueue';
 import type { DashboardOverviewView, StatsView, SyncStatusView } from '../types/api';
 import type {
   RealtimeServerEvent,
@@ -9,14 +10,8 @@ import type {
   WsSyncStatusPayload,
 } from '../types/realtime';
 
-const WS_REFRESH_DEBOUNCE_MS = 1200;
 const WS_RECONNECT_BASE_MS = 1000;
 const WS_RECONNECT_MAX_MS = 15_000;
-const POLL_REFRESH_QUERY_KEYS: ReadonlyArray<ReadonlyArray<unknown>> = [
-  ['dashboard-overview'],
-  ['stats'],
-  ['sync-status'],
-];
 const BLOCK_EVENT_REFRESH_QUERY_KEYS: ReadonlyArray<ReadonlyArray<unknown>> = [
   ['dashboard-overview'],
   ['stats'],
@@ -43,6 +38,8 @@ const TERMINAL_SYNC_REFRESH_QUERY_KEYS: ReadonlyArray<ReadonlyArray<unknown>> = 
   ['mempool'],
   ['migration-transparency'],
 ];
+
+const POLL_REFRESH_QUERY_KEYS = TERMINAL_SYNC_REFRESH_QUERY_KEYS;
 
 type AutoRefreshContextValue = {
   realtimeConnected: boolean;
@@ -146,9 +143,6 @@ export function AutoRefreshProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const isPageVisible = usePageVisibility();
   const [realtimeConnected, setRealtimeConnected] = useState(false);
-  const inFlightRef = useRef(false);
-  const queuedRealtimeRefreshRef = useRef<number | null>(null);
-  const lastRealtimeRefreshAtRef = useRef(0);
   const lastRealtimeSeqRef = useRef<number | null>(null);
 
   const setKnownLastBlock = useCallback(
@@ -167,64 +161,25 @@ export function AutoRefreshProvider({ children }: { children: ReactNode }) {
     [queryClient]
   );
 
-  const runRefresh = useCallback(async (queryKeys: ReadonlyArray<ReadonlyArray<unknown>> = POLL_REFRESH_QUERY_KEYS) => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-    try {
-      await Promise.all(
-        queryKeys.map((queryKey) =>
-          queryClient.refetchQueries({ queryKey, type: 'active' })
-        )
-      );
-    } finally {
-      lastRealtimeRefreshAtRef.current = Date.now();
-      inFlightRef.current = false;
-    }
-  }, [queryClient]);
-
-  const scheduleRealtimeRefresh = useCallback(
-    (
-      priority: 'normal' | 'high' = 'normal',
-      queryKeys: ReadonlyArray<ReadonlyArray<unknown>> = POLL_REFRESH_QUERY_KEYS
-    ) => {
-      if (!isPageVisible) return;
-      const minGap = priority === 'high' ? 250 : WS_REFRESH_DEBOUNCE_MS;
-      const now = Date.now();
-      const elapsed = now - lastRealtimeRefreshAtRef.current;
-
-      if (priority === 'high' && elapsed >= minGap && !inFlightRef.current) {
-        void runRefresh(queryKeys);
-        return;
-      }
-
-      if (queuedRealtimeRefreshRef.current != null) {
-        return;
-      }
-
-      const delay = Math.max(0, minGap - elapsed);
-      queuedRealtimeRefreshRef.current = window.setTimeout(() => {
-        queuedRealtimeRefreshRef.current = null;
-        void runRefresh(queryKeys);
-      }, delay);
-    },
-    [isPageVisible, runRefresh]
-  );
+  const refreshQueue = useMemo(() => createRefreshQueue((keys) => Promise.allSettled(
+    keys.map((queryKey) => queryClient.refetchQueries({ queryKey, type: 'active' }))
+  )), [queryClient]);
 
   useEffect(() => {
-    if (!isPageVisible && queuedRealtimeRefreshRef.current != null) {
-      window.clearTimeout(queuedRealtimeRefreshRef.current);
-      queuedRealtimeRefreshRef.current = null;
-    }
-  }, [isPageVisible]);
+    refreshQueue.setActive(isPageVisible);
+    return () => refreshQueue.setActive(false);
+  }, [isPageVisible, refreshQueue]);
 
-  useEffect(() => {
-    return () => {
-      if (queuedRealtimeRefreshRef.current != null) {
-        window.clearTimeout(queuedRealtimeRefreshRef.current);
-        queuedRealtimeRefreshRef.current = null;
-      }
-    };
-  }, []);
+  const runRefresh = useCallback((keys: RefreshKeys = POLL_REFRESH_QUERY_KEYS) => {
+    refreshQueue.enqueue(keys, 'immediate');
+  }, [refreshQueue]);
+
+  const scheduleRealtimeRefresh = useCallback((
+    priority: 'normal' | 'high' = 'normal',
+    keys: RefreshKeys = POLL_REFRESH_QUERY_KEYS
+  ) => {
+    refreshQueue.enqueue(keys, priority);
+  }, [refreshQueue]);
 
   useEffect(() => {
     if (!isPageVisible) return;

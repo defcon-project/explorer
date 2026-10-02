@@ -8,6 +8,7 @@ import fs from 'fs';
 import mongoose from 'mongoose';
 import { SITE_NAME, resolveRouteSeo } from '@defcon/shared';
 import { config } from './config';
+import { renderBootData } from './utils/bootData';
 import { connectDatabase } from './config/database';
 import { logger } from './utils/logger';
 import { syncService } from './services/sync.service';
@@ -151,11 +152,6 @@ function applySpaShellCacheHeaders(res: express.Response): void {
 // render real data before its first fetch. The client seeds these into the
 // React Query cache as already-stale entries, so it still revalidates in the
 // background — worst case the boot data is shell-cache age (~60s edge) old.
-function safeBootJson(value: unknown): string {
-  // <-escape to keep "</script>" sequences inside the JSON inert.
-  return JSON.stringify(value).replace(/</g, '\\u003c');
-}
-
 async function buildBootScript(pathname: string): Promise<string> {
   try {
     const wantsDashboard = normalizeSpaShellPath(pathname) === '/';
@@ -169,7 +165,7 @@ async function buildBootScript(pathname: string): Promise<string> {
     if (overview?.data) boot.dashboardOverview = overview.data;
     if (Object.keys(boot).length === 0) return '';
 
-    return `<script>window.__DEFTRACK_BOOT__=${safeBootJson(boot)}</script>`;
+    return renderBootData(boot);
   } catch {
     return '';
   }

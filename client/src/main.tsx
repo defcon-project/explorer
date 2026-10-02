@@ -7,14 +7,14 @@ import { ThemeProvider, applyThemeAttribute, resolveInitialTheme } from './conte
 import { AutoRefreshProvider } from './context/AutoRefreshContext';
 import { queryClient } from './queryClient';
 import './styles/globals.css';
+import { readBootData } from './utils/bootData';
 
 applyThemeAttribute(resolveInitialTheme());
 
 // Server-injected first-paint data (see buildBootScript in server/src/index.ts).
 // Seeded with updatedAt: 0 so it renders instantly but is treated as stale —
 // React Query revalidates it in the background right after mount.
-type BootData = { stats?: unknown; dashboardOverview?: unknown };
-const boot = (window as Window & { __DEFTRACK_BOOT__?: BootData }).__DEFTRACK_BOOT__;
+const boot = readBootData();
 if (boot?.stats) {
   queryClient.setQueryData(['stats'], boot.stats, { updatedAt: 0 });
 }

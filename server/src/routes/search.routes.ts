@@ -46,7 +46,7 @@ function getSearchCache(key: string): SearchPayload | undefined {
   const entry = searchCache.get(key);
   if (!entry) return undefined;
   if (!isFresh(entry.atMs, SEARCH_CACHE_TTL_MS)) {
-    searchCache.delete(key);
+    // Retain until the longer stale deadline so a failed refresh can fall back.
     return undefined;
   }
   // LRU touch

@@ -66,7 +66,7 @@ function getGraphCache(key: string): GraphResponsePayload | null {
   const entry = graphCache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.atMs >= GRAPH_CACHE_TTL_MS) {
-    graphCache.delete(key);
+    // Retain until the longer stale deadline so a failed refresh can fall back.
     return null;
   }
   // LRU touch
@@ -99,7 +99,7 @@ function getRewardsCache(key: string): RewardsResponsePayload | null {
   const entry = rewardsCache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.atMs >= REWARDS_CACHE_TTL_MS) {
-    rewardsCache.delete(key);
+    // Retain until the longer stale deadline so a failed refresh can fall back.
     return null;
   }
   rewardsCache.delete(key);

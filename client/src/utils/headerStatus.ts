@@ -1,43 +1,65 @@
 import type { StatsView, SyncStatusView } from '../types/api';
 
+const CHAIN_STALE_MIN_SECONDS = 10 * 60;
+// Sync status older than this is ignored, so a failed refresh never pins an old state.
+const SYNC_STATUS_MAX_AGE_MS = 120_000;
+
+export interface HeaderStatus {
+  label: string;
+  title: string;
+  healthy: boolean;
+}
+
+export function formatAge(ageSeconds: number): string {
+  if (ageSeconds < 60) return 'under a minute';
+  const minutes = Math.floor(ageSeconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
 export function getHeaderStatus(
   stats: StatsView | undefined,
   sync: SyncStatusView | undefined,
   syncUpdatedAt: number,
   nowMs: number,
   realtimeConnected: boolean,
-) {
-  if (!sync) return { label: 'Checking', title: 'Waiting for sync status', healthy: false };
-  // A failed refresh can retain previous data. Do not present it as current forever.
-  if (nowMs - syncUpdatedAt > 120_000) {
-    return { label: 'Unavailable', title: 'Sync status has not refreshed for over two minutes', healthy: false };
+): HeaderStatus {
+  // A fresh sync status can name a concrete cause. Without one, the header falls back
+  // to the freshness of the indexed chain.
+  if (sync && nowMs - syncUpdatedAt <= SYNC_STATUS_MAX_AGE_MS) {
+    if (sync.rpcConnected === false || sync.errorCode === 'RPC_UNAVAILABLE') {
+      return { label: 'Disconnected', title: 'Explorer cannot reach the node', healthy: false };
+    }
+    if (sync.error) {
+      return { label: 'Sync error', title: 'Explorer indexing reported an error', healthy: false };
+    }
+    if (sync.daemonHeight >= 0 && sync.lastSyncedHeight >= 0) {
+      const remaining = Math.max(sync.blocksRemaining, sync.daemonHeight - sync.lastSyncedHeight, 0);
+      // One block behind is the ordinary transition while a new block is being indexed.
+      if (remaining > 1) {
+        return { label: 'Syncing', title: `Indexing ${remaining} remaining blocks`, healthy: false };
+      }
+    }
   }
-  if (sync.rpcConnected === false || sync.errorCode === 'RPC_UNAVAILABLE') {
-    return { label: 'Disconnected', title: 'Explorer cannot reach the node', healthy: false };
-  }
-  if (sync.error) return { label: 'Sync error', title: 'Explorer indexing reported an error', healthy: false };
-  if (sync.rpcConnected !== true || sync.daemonHeight < 0 || sync.lastSyncedHeight < 0) {
-    return { label: 'Checking', title: 'Waiting for a confirmed node and index height', healthy: false };
-  }
-  const remaining = Math.max(sync.blocksRemaining, sync.daemonHeight - sync.lastSyncedHeight, 0);
-  if (remaining > 0) {
+
+  if (!stats) return { label: 'Checking', title: 'Waiting for indexed chain status', healthy: false };
+
+  const chainAgeSeconds =
+    typeof stats.lastBlockTime === 'number'
+      ? Math.max(0, Math.floor(nowMs / 1000) - stats.lastBlockTime)
+      : null;
+  const staleAfterSeconds = Math.max(CHAIN_STALE_MIN_SECONDS, (stats.avgBlockTime ?? 150) * 4);
+  if (chainAgeSeconds == null || chainAgeSeconds > staleAfterSeconds) {
     return {
-      label: 'Syncing',
-      title: `Indexing ${remaining} remaining block${remaining === 1 ? '' : 's'}`,
-      // One block is an ordinary transition when a new block arrives.
-      healthy: remaining <= 1,
+      label: 'Delayed',
+      title: chainAgeSeconds == null
+        ? 'The indexed chain has no last-block timestamp'
+        : `Latest indexed block is ${formatAge(chainAgeSeconds)} old (freshness threshold: ${formatAge(staleAfterSeconds)})`,
+      healthy: false,
     };
   }
-  const age = stats?.lastBlockTime == null ? null : Math.max(0, nowMs / 1000 - stats.lastBlockTime);
-  const threshold = Math.max(600, (stats?.avgBlockTime ?? 150) * 4);
-  if (age != null && age > threshold) {
-    return {
-      label: 'Waiting',
-      title: 'Explorer is caught up with the node; waiting for the next block',
-      healthy: true,
-    };
-  }
+
   return realtimeConnected
-    ? { label: 'Live', title: 'Explorer is caught up; realtime connection is active', healthy: true }
-    : { label: 'Polling', title: 'Explorer is caught up; checking for updates by polling', healthy: true };
+    ? { label: 'Live', title: 'Realtime connection is active and the indexed chain is current', healthy: true }
+    : { label: 'Polling', title: 'Indexed chain is current; realtime connection is reconnecting', healthy: true };
 }

@@ -51,8 +51,8 @@ function HeaderStatusChips({ compact = false }: HeaderStatusChipsProps) {
   }, [isPageVisible]);
 
   const stats = statsQuery.data;
-  const height = formatMetric(syncQuery.data?.lastSyncedHeight != null && syncQuery.data.lastSyncedHeight >= 0
-    ? syncQuery.data.lastSyncedHeight : undefined);
+  const syncedHeight = syncQuery.data?.lastSyncedHeight;
+  const height = formatMetric(typeof syncedHeight === 'number' && syncedHeight >= 0 ? syncedHeight : stats?.blockHeight);
   const peers = formatMetric(stats?.connections);
   const masternodes = formatMetric(stats?.masternodes);
   const stakers = formatMetric(stats?.stakingWallets);
@@ -61,7 +61,7 @@ function HeaderStatusChips({ compact = false }: HeaderStatusChipsProps) {
   return (
     <div className={`header-status-chips ${compact ? 'compact' : ''}`} aria-label="Network status">
       <div
-        className={`status-chip status-chip-live ${status.healthy ? 'online' : 'degraded'}`}
+        className={`status-chip status-chip-live ${status.label === 'Live' ? 'online' : 'degraded'}`}
         title={status.title}
       >
         <span className="status-dot" aria-hidden="true" />

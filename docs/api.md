@@ -217,3 +217,34 @@ Discovery files are served from `client/public`: `/llms.txt`, `/llms-full.txt`, 
 The `mcp/` workspace is a stdio MCP server with the tools `lookup`, `network`, `masternode` and `pose_bans`.
 It sends only `GET` requests to the public API and limits itself to 20 requests per minute. Build, run and
 client configuration are in [`mcp/README.md`](../mcp/README.md).
+# Operator diagnosis
+
+`GET /api/v1/masternodes/operator-diagnosis` is a no-store, rate-limited read of the
+full live registered masternode list and existing retained history/inventory.
+It starts no collector or network probe. A validated complete `protx list registered 1`
+is required; RPC failure or incomplete state returns 503, with no stale fallback.
+Successful snapshots are shared/cached for 30 seconds. The response includes
+`generatedAt`, `registeredCount`, `maxPenalty`, `historySince`, `historyLimited`,
+and nodes with `proTxHash`, `service`, and server-computed `operatorDiagnosis[]`.
+Each diagnosis has `code`, `level`, `evidence`, `message`, `hint`, `since`, `source`,
+and `operatorAction` (highlight eligibility).
+
+- `BAN_NEXT_DKG`: unbanned and not DSL-banned, penalty at least
+  `max(100, registeredCount) - floor(max(100, registeredCount) * 66 / 100)`.
+  Its risk and score-decay estimate assume no new penalties/suspensions or registry
+  changes; they do not predict a particular next-block ban.
+- `REVIVE_LOOP`: at least three distinct recorded recoveries followed by a ban
+  in 1–4 blocks, using stable proTx identity and actual event heights. History is
+  limited to the most recent 10,000 retained ban documents in 90 days. Pattern
+  evidence does not establish the ban cause or prove a revival script exists.
+- `OLD_VERSION`: last observed major version below 23; observations older than
+  24 hours are informational. Missing/future observation times are excluded.
+- `WRONG_CHAIN`: last-known inventory `behind`/`hash_mismatch`. Behind is lag,
+  not proof of a fork. Inventory update time is explicitly distinguished from a
+  chain-probe timestamp. Version/chain observations do not qualify for orange cues.
+
+Inventory is matched by exact IP/port and compatible registration hash. Only chain
+action evidence qualifies for orange highlighting in this phase. The UI expires
+action snapshots after three minutes and suppresses them on failed refreshes.
+Node links use `/ban-detection?node=<proTx|IP>`; “Operator notice” copies the filtered
+diagnoses and evidence times for operator review. It sends no message.

@@ -29,10 +29,12 @@ test('Q60 view separates current counts and repeated identities, includes isolat
   await expect(page.locator('.bd-current-stats')).toContainText('166');
   await expect(page.getByText('3 distinct ban events')).toBeVisible();
   await expect(page.getByText('1 events excluded: ban block unknown')).toBeVisible();
-  await expect(page.locator('.bd-node-panel tbody tr')).toHaveCount(1);
+  await expect(page.locator('.bd-node-panel tbody tr')).toHaveCount(2);
   await expect(page.locator('.bd-node-panel tbody')).toContainText('112');
   expect(requests[0].searchParams.get('scope')).toBe('q60');
   await page.screenshot({ path: testInfo.outputPath('ban-detection-q60.png'), fullPage: true });
+  await page.getByLabel('Repeated bans only').check();
+  await expect(page.locator('.bd-node-panel tbody tr')).toHaveCount(1);
   await page.getByLabel('Repeated bans only').uncheck();
   await expect(page.locator('.bd-node-panel tbody tr')).toHaveCount(2);
   await page.getByLabel('Find node').fill('198.51.100.2');

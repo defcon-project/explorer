@@ -72,6 +72,8 @@ export function summarizeTrackedBanNodes(events: HistoricalBanEvent[]) {
 }
 
 export interface BanWaveNodeBase {
+  asn?: number | null;
+  asnOrg?: string | null;
   ip: string;
   operatorPubkey: string | null;
   countryCode: string;
@@ -82,6 +84,9 @@ export interface BanWaveNodeBase {
 }
 
 export interface BanWave<TNode extends BanWaveNodeBase> {
+  asnClusters: Array<{ asn: number; organization: string | null; nodes: number; sharePct: number }>;
+  asnKnownNodes: number;
+  asnUnknownNodes: number;
   id: string;
   startedAt: string;
   endedAt: string;
@@ -233,8 +238,22 @@ export function buildBanWaves<TNode extends BanWaveNodeBase>(
     const recoveredCount = nodes.filter((node) => node.status === 'recovered').length;
     const stillBannedCount = nodes.filter((node) => node.status === 'still_banned').length;
     const severity = scoreBanWave(nodes, durationSeconds);
+    const byAsn = new Map<number, { count: number; organizations: Set<string> }>();
+    for (const node of nodes) {
+      if (!Number.isSafeInteger(node.asn) || node.asn! <= 0) continue;
+      const row = byAsn.get(node.asn!) ?? { count: 0, organizations: new Set<string>() };
+      row.count++;
+      if (node.asnOrg) row.organizations.add(node.asnOrg);
+      byAsn.set(node.asn!, row);
+    }
+    const asnClusters = [...byAsn].map(([asn, row]) => ({ asn,
+      organization: row.organizations.size === 1 ? [...row.organizations][0] : null,
+      nodes: row.count, sharePct: Math.round(row.count / nodes.length * 1000) / 10,
+    })).sort((a, b) => b.nodes - a.nodes || a.asn - b.asn);
+    const asnKnownNodes = asnClusters.reduce((sum, row) => sum + row.nodes, 0);
 
     waves.push({
+      asnClusters, asnKnownNodes, asnUnknownNodes: nodes.length - asnKnownNodes,
       id: `wave-${base.at}`,
       startedAt: new Date(base.at).toISOString(),
       endedAt: new Date(lastAt).toISOString(),

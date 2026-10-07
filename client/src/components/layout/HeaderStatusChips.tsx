@@ -1,28 +1,21 @@
 import { memo, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchStats } from '../../services/api';
+import { fetchStats, fetchSyncStatus } from '../../services/api';
 import { useAutoRefresh } from '../../context/AutoRefreshContext';
 import { usePageVisibility } from '../../hooks/usePageVisibility';
 import { formatNumber } from '../../utils/formatters';
+import { getHeaderStatus } from '../../utils/headerStatus';
 import type { DashboardOverviewView, StatsView } from '../../types/api';
 
 interface HeaderStatusChipsProps {
   compact?: boolean;
 }
 
-const CHAIN_STALE_MIN_SECONDS = 10 * 60;
-const STATUS_CLOCK_INTERVAL_MS = 60_000;
+const STATUS_CLOCK_INTERVAL_MS = 30_000;
 
 function formatMetric(value: number | undefined): string {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
   return formatNumber(value);
-}
-
-function formatAge(ageSeconds: number): string {
-  if (ageSeconds < 60) return 'under a minute';
-  const minutes = Math.floor(ageSeconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
 function HeaderStatusChips({ compact = false }: HeaderStatusChipsProps) {
@@ -42,6 +35,13 @@ function HeaderStatusChips({ compact = false }: HeaderStatusChipsProps) {
     refetchInterval: isPageVisible ? 60_000 : false,
   });
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const syncQuery = useQuery({
+    // Keep confirmed RPC health separate from partial websocket sync updates.
+    queryKey: ['header-sync-status'],
+    queryFn: fetchSyncStatus,
+    staleTime: 15_000,
+    refetchInterval: isPageVisible ? 30_000 : false,
+  });
 
   useEffect(() => {
     if (!isPageVisible) return;
@@ -51,34 +51,17 @@ function HeaderStatusChips({ compact = false }: HeaderStatusChipsProps) {
   }, [isPageVisible]);
 
   const stats = statsQuery.data;
-  const height = formatMetric(stats?.blockHeight);
+  const height = formatMetric(syncQuery.data?.lastSyncedHeight != null && syncQuery.data.lastSyncedHeight >= 0
+    ? syncQuery.data.lastSyncedHeight : undefined);
   const peers = formatMetric(stats?.connections);
   const masternodes = formatMetric(stats?.masternodes);
   const stakers = formatMetric(stats?.stakingWallets);
-  const chainAgeSeconds =
-    typeof stats?.lastBlockTime === 'number'
-      ? Math.max(0, Math.floor(nowMs / 1000) - stats.lastBlockTime)
-      : null;
-  const staleAfterSeconds = Math.max(CHAIN_STALE_MIN_SECONDS, (stats?.avgBlockTime ?? 150) * 4);
-  const chainFresh = chainAgeSeconds != null && chainAgeSeconds <= staleAfterSeconds;
-  const status = !stats
-    ? { label: 'Checking', title: 'Waiting for indexed chain status' }
-    : !chainFresh
-      ? {
-          label: 'Delayed',
-          title: chainAgeSeconds == null
-            ? 'The indexed chain has no last-block timestamp'
-            : `Latest indexed block is ${formatAge(chainAgeSeconds)} old (freshness threshold: ${formatAge(staleAfterSeconds)})`,
-        }
-      : realtimeConnected
-        ? { label: 'Live', title: 'Realtime connection is active and the indexed chain is current' }
-        : { label: 'Polling', title: 'Indexed chain is current; realtime connection is reconnecting' };
-  const isLive = status.label === 'Live';
+  const status = getHeaderStatus(stats, syncQuery.data, syncQuery.dataUpdatedAt, nowMs, realtimeConnected);
 
   return (
     <div className={`header-status-chips ${compact ? 'compact' : ''}`} aria-label="Network status">
       <div
-        className={`status-chip status-chip-live ${isLive ? 'online' : 'degraded'}`}
+        className={`status-chip status-chip-live ${status.healthy ? 'online' : 'degraded'}`}
         title={status.title}
       >
         <span className="status-dot" aria-hidden="true" />

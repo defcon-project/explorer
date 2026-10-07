@@ -42,8 +42,15 @@ import type {
   DashboardOverviewView,
 } from '../types/api';
 import type { OpenApiDocument } from '../types/openapi';
+import type { PoseChainData } from '@defcon/shared/dist/contracts';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
+
+export async function fetchPoseChainSummary(params: { hours: number; since?: string; fromHeight?: number }): Promise<PoseChainData> {
+  const { data } = await api.get<ApiEnvelope<PoseChainData>>('/v1/masternodes/pose-chain', { params: { ...params, limit: 1 } });
+  if (!data.success || !data.data) throw new Error('Ban attribution unavailable');
+  return data.data;
+}
 
 export async function fetchActiveMasternodeVersions() {
   const { data } = await api.get<ApiEnvelope<ActiveMasternodeVersionsView>>('/v1/node-inventory/active-versions');

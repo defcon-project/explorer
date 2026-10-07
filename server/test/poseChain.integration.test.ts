@@ -388,6 +388,20 @@ describe.skipIf(!baseUri)('canonical PoSe collection with disposable MongoDB', (
     expect(poseChainDataSchema.safeParse(malformed).success).toBe(false);
   });
 
+  it('keeps verified bans and coverage inside the selected time and activation-height window', async () => {
+    enablePenaltyEvidence(); await service.collectOnce();
+    const since = new Date(blocks.get(101)!.time * 1000).toISOString();
+    const timed = await getPoseChainData(query({ since }));
+    expect(timed).toMatchObject({ total: 2, penaltyCoverage: { commitmentBlocks: 2, verifiedBlocks: 2 } });
+    expect(timed.quorumSummary[0]).toMatchObject({ penaltyApplications: 2, newBans: 0 });
+    expect(timed.commitments.map((row) => row.blockHeight)).toEqual([102, 101]);
+    const activation = await getPoseChainData(query({ fromHeight: 102 }));
+    expect(activation).toMatchObject({ total: 1, penaltyCoverage: { commitmentBlocks: 1, verifiedBlocks: 1 } });
+    expect(activation.quorumSummary[0].newBans).toBe(0);
+    const empty = await getPoseChainData(query({ fromHeight: 103 }));
+    expect(empty).toMatchObject({ total: 0, quorumSummary: [], penaltyCoverage: { commitmentBlocks: 0, verifiedBlocks: 0 } });
+  });
+
   it('backfills old commitment-only records with a separate bounded scoring budget', async () => {
     enablePenaltyEvidence(false); await service.collectOnce();
     expect(rpc.call.mock.calls.some(([method]) => method === 'protx')).toBe(false);

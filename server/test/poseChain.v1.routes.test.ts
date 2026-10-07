@@ -32,10 +32,19 @@ describe('PoSe canonical commitment route', () => {
   });
 
   it('rejects invalid pagination, ranges and hashes before querying the store', async () => {
-    for (const query of ['hours=0', 'hours=8761', 'page=0', 'limit=51', 'quorumType=256', 'proTxHash=bad']) {
+    for (const query of ['hours=0', 'hours=8761', 'page=0', 'limit=51', 'quorumType=256', 'proTxHash=bad',
+      'since=bad', `since=${encodeURIComponent(new Date(Date.now() + 3600000).toISOString())}`,
+      'fromHeight=-1', 'fromHeight=1.5', 'fromHeight=', 'fromHeight=9007199254740992']) {
       expect((await request(app).get(`/api/v1/masternodes/pose-chain?${query}`)).status).toBe(400);
     }
     expect(mocks.getPoseChainData).not.toHaveBeenCalled();
+  });
+
+  it('passes a selected history start and activation height to the canonical store', async () => {
+    const since = new Date(Date.now() - 3600000).toISOString();
+    const response = await request(app).get('/api/v1/masternodes/pose-chain').query({ since, fromHeight: 144888 });
+    expect(response.status).toBe(200);
+    expect(mocks.getPoseChainData).toHaveBeenCalledWith({ hours: 24, page: 1, limit: 10, since, fromHeight: 144888 });
   });
 
   it('does not publish malformed service output or internal failure details', async () => {

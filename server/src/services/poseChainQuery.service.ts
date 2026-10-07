@@ -8,6 +8,8 @@ import type { PenaltyAttribution } from '../domain/pose/penaltyAttribution';
 
 export async function getPoseChainData(query: PoseChainQuery): Promise<PoseChainData> {
   const now = new Date();
+  const windowFrom = new Date(Math.max(now.getTime() - query.hours * 3600000,
+    query.since ? Date.parse(query.since) : 0));
   const state = await PoseChainState.findOne({ key: 'main' }).lean();
   const status: PoseChainData['status'] = !config.poseChain.enabled ? 'disabled'
     : !state || state.status === 'error' ? 'unavailable'
@@ -26,12 +28,15 @@ export async function getPoseChainData(query: PoseChainQuery): Promise<PoseChain
       confirmedThroughHeight: state?.targetHeight == null ? config.poseChain.startHeight - 1
         : Math.max(state.startHeight - 1, Math.min(state.lastHeight, state.targetHeight)),
     },
-    windowHours: query.hours, page: query.page, limit: query.limit, total: 0, quorumSummary: [], commitments: [],
+    windowHours: query.hours, windowFrom: windowFrom.toISOString(), page: query.page, limit: query.limit, total: 0, quorumSummary: [], commitments: [],
     penaltyCoverage: { enabled: config.poseChain.attributionEnabled, commitmentBlocks: 0, verifiedBlocks: 0,
       pendingBlocks: 0, unavailableBlocks: 0, unsupportedBlocks: 0, inconsistentBlocks: 0, notApplicableBlocks: 0 },
   };
   // Never publish trusted attribution during rollback, failed validation, or stale checks.
   if (status !== 'ready' || !state) return data;
+  const range = { canonical: true,
+    height: { $gte: Math.max(state.startHeight, query.fromHeight ?? 0), $lte: data.coverage.confirmedThroughHeight },
+    time: { $gte: windowFrom, $lte: now } };
   const filters: Record<string, unknown> = {};
   if (query.quorumType !== undefined) filters['commitments.quorumType'] = query.quorumType;
   if (query.proTxHash !== undefined) filters['commitments.members.proTxHash'] = query.proTxHash;
@@ -43,8 +48,7 @@ export async function getPoseChainData(query: PoseChainQuery): Promise<PoseChain
       ...(bansOnly ? [{ $eq: ['$$application.causedBan', true] }] : [])] },
   } });
   const pipeline: PipelineStage[] = [
-    { $match: { canonical: true, height: { $gte: state.startHeight, $lte: data.coverage.confirmedThroughHeight },
-      time: { $gte: new Date(now.getTime() - query.hours * 3600000), $lte: now } } },
+    { $match: range },
     { $unwind: '$commitments' },
     { $match: filters },
     { $facet: {
@@ -82,8 +86,7 @@ export async function getPoseChainData(query: PoseChainQuery): Promise<PoseChain
   }>(pipeline).option({ maxTimeMS: 10000 });
   if (config.poseChain.attributionEnabled) {
     const counts = await PoseChainBlock.aggregate<{ _id: string | null; count: number }>([
-      { $match: { canonical: true, height: { $gte: state.startHeight, $lte: data.coverage.confirmedThroughHeight },
-        'commitments.0': { $exists: true } } },
+      { $match: { ...range, 'commitments.0': { $exists: true } } },
       { $group: { _id: '$penaltyAttribution.status', count: { $sum: 1 } } },
     ]).option({ maxTimeMS: 10000 });
     for (const row of counts) {

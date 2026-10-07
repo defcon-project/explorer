@@ -15,6 +15,8 @@ export const poseChainQuerySchema = z.object({
   hours: z.coerce.number().int().min(1).max(8760).default(24),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(10),
+  since: dateTime.refine((value) => Date.parse(value) <= Date.now(), 'Future window start').optional(),
+  fromHeight: z.union([integer, z.string().regex(/^\d+$/).transform(Number).pipe(integer)]).optional(),
   quorumType: z.coerce.number().int().min(0).max(255).optional(),
   proTxHash: z.string().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase()).optional(),
 });
@@ -27,7 +29,7 @@ export const poseChainDataSchema = z.object({
     remainingBlocks: integer.nullable(), caughtUp: z.boolean(),
     confirmedThroughHeight: z.number().int(),
   }),
-  windowHours: integer, page: integer, limit: integer, total: integer,
+  windowHours: integer, windowFrom: dateTime.optional(), page: integer, limit: integer, total: integer,
   penaltyCoverage: z.object({ enabled: z.boolean(), commitmentBlocks: integer, verifiedBlocks: integer,
     pendingBlocks: integer, unavailableBlocks: integer, unsupportedBlocks: integer, inconsistentBlocks: integer,
     notApplicableBlocks: integer }),

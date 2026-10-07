@@ -24,6 +24,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { fetchBanWaveAnalysis } from '../services/api';
+import { BanTypeShareKpi } from '../components/BanTypeShareKpi';
 import { useChartAnimation } from '../utils/chartAnimation';
 import { formatNumber, truncateHash } from '../utils/formatters';
 import type { BanWaveAnalysisView, BanWaveDetail } from '../types/api';
@@ -345,6 +346,9 @@ export function BanDetectionPage() {
           value={data ? humanDuration(data.kpis.meanTimeBetweenWavesSec) : '-'}
           sub="Lower = more clustered"
         />
+        <BanTypeShareKpi hours={win.hours} since={data?.analysisScope?.from}
+          fromHeight={windowKey === 'q60' ? data?.analysisScope?.activationHeight : undefined}
+          enabled={!!data && !isError && data.dataStatus !== 'stale'} paused={paused || !isPageVisible} />
       </section>
 
       {/* Timeline ComposedChart */}

@@ -2,6 +2,9 @@
 
 .bd-section-title { margin: 1.2rem 0 0.7rem; }
 .bd-current-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.bd-type-share { grid-column: 1 / -1; }
+.bd-type-share .mnh-stat-sub { margin-top: 0.35rem; }
+.bd-type-share button { margin-top: 0.6rem; }
 .bd-monitor-status { margin-top: 0.9rem; font-size: 0.82rem; overflow-wrap: anywhere; }
 .bd-analysis-controls { display: flex; flex-wrap: wrap; gap: 0.8rem 1.2rem; align-items: center; margin-bottom: 1rem; }
 .bd-analysis-controls label { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.85rem; }

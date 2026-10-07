@@ -2,6 +2,8 @@ export * from './api';
 export * from './masternodes';
 export * from './nodeMonitoring';
 export * from './pose';
+export * from './poseTelemetry';
+export * from './poseChain';
 export * from './search';
 export * from './stats';
 

@@ -49,6 +49,12 @@ export type {
   MasternodeHealthTimelinePointContract,
   MasternodeOffenderContract,
   MasternodePoseWatchEntryContract,
+  NetworkNoiseIngestPayload,
+  PoseTelemetryEvent,
+  PoseEventsQuery,
+  PoseObservedEventsContract,
+  PoseChainData,
+  PoseChainQuery,
 } from './contracts';
 export {
   DEFAULT_ROBOTS,

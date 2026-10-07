@@ -146,4 +146,26 @@ describe('server configuration', () => {
       /ADMIN_API_KEY must contain at least 32 characters/
     );
   });
+
+  it('retains structured PoSe observations independently of legacy noise', () => {
+    expect(loadConfig({}).networkNoise.poseObservationTtlDays).toBe(365);
+    const parsed = loadConfig({ POSE_OBSERVATION_TTL_DAYS: '730', NETWORK_NOISE_OBSERVATION_TTL_DAYS: '7' });
+    expect(parsed.networkNoise.poseObservationTtlDays).toBe(730);
+    expect(parsed.networkNoise.observationTtlDays).toBe(7);
+    expect(() => loadConfig({ POSE_OBSERVATION_TTL_DAYS: '0' })).toThrow(/POSE_OBSERVATION_TTL_DAYS/);
+    expect(() => loadConfig({ POSE_OBSERVATION_TTL_DAYS: '1826' })).toThrow(/POSE_OBSERVATION_TTL_DAYS/);
+  });
+
+  it('leaves canonical collection opt-in and bounds its RPC and reorg budgets', () => {
+    expect(loadConfig({}).poseChain).toEqual({ enabled: false, startHeight: 144888, blocksPerRun: 50,
+      confirmations: 3, intervalMs: 30000, reorgMaxDepth: 128, membershipRetryBlocks: 5,
+      attributionEnabled: false, attributionBlocksPerRun: 5 });
+    expect(loadConfig({ POSE_CHAIN_COLLECTOR_ENABLED: 'true', POSE_CHAIN_MEMBERSHIP_RETRY_BLOCKS: '0' }).poseChain)
+      .toMatchObject({ enabled: true, membershipRetryBlocks: 0 });
+    for (const [key, value] of Object.entries({ POSE_CHAIN_START_HEIGHT: '0', POSE_CHAIN_BLOCKS_PER_RUN: '201',
+      POSE_CHAIN_CONFIRMATIONS: '0', POSE_CHAIN_POLL_INTERVAL_MS: '9999', POSE_CHAIN_REORG_MAX_DEPTH: '0',
+      POSE_CHAIN_MEMBERSHIP_RETRY_BLOCKS: '21', POSE_CHAIN_ATTRIBUTION_BLOCKS_PER_RUN: '0' })) {
+      expect(() => loadConfig({ [key]: value })).toThrow(key);
+    }
+  });
 });

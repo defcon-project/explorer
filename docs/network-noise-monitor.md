@@ -12,7 +12,9 @@ DeFCoN node + agent (external, one per node)
 DefTrack server
   -> networknoiseobservations               one document per signal, removed by a TTL index
   -> networknoisenodestates                 one document per node, latest snapshot and score
+  -> poseobservations                      structured v2 event observations, separate retention
   -> GET /api/v1/network-noise/summary      public, no authentication
+  -> GET /api/v1/network-noise/pose-events  public, paginated observed event candidates
 Web client
   -> /devtools/network-noise                polls the summary every 60 s while the tab is visible
 ```
@@ -21,7 +23,9 @@ This repository does not include the node-side agent. It only defines the ingest
 
 | Component | Location |
 | --- | --- |
-| Ingest and summary routes, payload schema | `server/src/routes/v1/networkNoise.v1.routes.ts` |
+| Ingest, summary and structured event routes | `server/src/routes/v1/networkNoise.v1.routes.ts` |
+| Shared v1/v2 ingest and structured event schemas | `shared/src/contracts/poseTelemetry.ts` |
+| Structured observation storage and grouping | `server/src/services/poseTelemetry.service.ts`, `server/src/models/PoseObservation.ts` |
 | Scoring, storage, and aggregation | `server/src/services/networkNoise.service.ts` |
 | MongoDB models | `server/src/models/NetworkNoiseObservation.ts`, `server/src/models/NetworkNoiseNodeState.ts` |
 | Summary response contract | `shared/src/contracts/nodeMonitoring.ts` |
@@ -152,6 +156,107 @@ Response (`202`):
 ```
 
 If the same batch is sent again, the response is `200` with `{ "duplicate": true, "acceptedSignals": 0, "noiseScore": 0 }`.
+
+### Structured PoSe/DKG payload (`schemaVersion` 2)
+
+Version 1 agents continue to work unchanged. Version 2 carries the same batch,
+snapshot and legacy `signals` fields, plus a required `poseEvents` array (0–100
+entries). Each entry describes one source event, with no occurrence multiplier.
+The legacy score, `activeSignals` and timeline continue to use `signals` only;
+`poseEvents` do not add another copy of a signal to those metrics. A v2 cycle is
+marked clean only when both arrays are empty.
+
+| `poseEvents[]` field | Rules |
+| --- | --- |
+| `eventId` | Stable source record ID, 8–128 characters from `A-Z a-z 0-9 . _ : -`; unique in a batch. Keep it across retries. Derive it from the source file generation and record offset, not the legacy hash-stripped fingerprint |
+| `kind` | `penalty_change`, `ban`, `recovery`, `dkg_member`, or `quorum_build_failure` |
+| `eventAt` | ISO date-time from the source event, distinct from batch `observedAt` |
+| `eventBlockHeight`, `eventBlockHash` | Explicit integer/64-character hex hash or `null` when unavailable; never copy the batch snapshot into these fields |
+| `quorumType`, `quorumHash` | Integer 0–255 / 64-character hex hash, or `null`; numeric types are retained without assuming every type is Q60 |
+| `proTxHash` | 64-character hex hash; required for member events, nullable for local quorum build failures |
+| `previousPenalty`, `penalty` | Nonnegative integers or `null`; both required for `penalty_change` |
+| `poseBanHeight` | Nonnegative integer or `null`; positive for `ban` |
+| `memberValid` | Boolean for `dkg_member`, otherwise `null`; DKG entries also require quorum type and hash |
+| `sample` | Optional redacted excerpt, at most 300 characters, or `null`; same agent redaction responsibility as legacy samples |
+
+All fields except `sample` must be present, including explicit `null` values.
+Hashes are normalized to lowercase. Safe integers are required. Unknown fields,
+including any agent-supplied canonical or evidence label, are discarded. The
+100 KB request body limit still applies to the combined payload.
+
+Example entry in `poseEvents` (identifiers are illustrative):
+
+```json
+{
+  "eventId": "debug-generation-4:offset-101",
+  "kind": "penalty_change",
+  "eventAt": "2026-10-06T12:01:00Z",
+  "eventBlockHeight": 147909,
+  "eventBlockHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "quorumType": 2,
+  "quorumHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "proTxHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "previousPenalty": 0,
+  "penalty": 145,
+  "poseBanHeight": null,
+  "memberValid": null,
+  "sample": "redacted PoSe penalty 0 -> 145"
+}
+```
+
+The v2 ingest response adds `acceptedPoseObservations`, the number of newly
+inserted observer records. This is neither a ban count nor a chain-verified
+penalty count. A replayed sequence returns zero. Both observation stores are
+written before the node's sequence advances; a storage failure remains retryable.
+
+### Structured observation storage and identity
+
+`poseobservations` stores source events, agent version and role, event/report/
+server-receipt times, and explicitly named `snapshotBlockHeight` /
+`snapshotBlockHash`. It stores no reported IP or peer IP. Its independent
+`POSE_OBSERVATION_TTL_DAYS` retention defaults to 365 days (range 1–1825), measured
+from the first server receipt. Changing retention affects new records only;
+replays neither extend expiry nor replace the first report's metadata.
+
+A complete candidate identity is event block height and hash + quorum type and
+base hash + proTxHash + event kind. Each reporter contributes once per candidate
+and score variant, even across higher batch sequences or changed source IDs.
+Conflicting score reports remain separate observations under the same candidate,
+with distinct reporters counted once. Missing identity fields keep records local
+to `nodeId + eventId`; nearby timestamps or snapshot heights never fill the gaps.
+`quorum_build_failure` always remains a local observation, even when hashes are
+available. Two quorum types or alternate block hashes produce separate candidates.
+
+These records are **agent claims**. A full identity or several reporters does not
+prove canonicality, a DKG penalty, or the root cause of member invalidity. This
+stage does not query RPC, confirm commitments, retract reorged chain events, or
+backfill chain history. It preserves alternate hashes for subsequent validation.
+
+### Structured event API
+
+`GET /api/v1/network-noise/pose-events` returns a no-store, shared-schema-validated
+response. It works even when ingest is disabled. Parameters are validated rather
+than clamped: `hours` 1–8760 (default 24), `page` 1–10000 (default 1), `limit` 1–100
+(default 50), and optional `kind`, `quorumType` and `proTxHash`. The window uses
+the source `eventAt`, excludes future events, and excludes expired records even
+before MongoDB's TTL cleanup. Pages sort by latest event time, then event key;
+they can move as new reports arrive.
+
+The response envelope is `{ "success": true, "data": ... }`. Data contains
+`generatedAt`, `windowHours`, configured `retentionDays`, pagination fields,
+`total` candidate groups, `observationCount`, `uncorrelatedEvents`,
+`chainVerifiedEvents: 0`, and `events`. These totals cover the filtered window,
+not just the page, and do not assert total network coverage.
+
+Each event includes its identity fields, first/last source time, latest retained
+report time, distinct `observerCount` / `observerNodeIds` / `observerRoles`,
+`observationCount`, `scoreVariants`, `hasConflictingScores`, and a representative
+sample. Every event is labeled `evidence: "log_observed"` and
+`canonicalStatus: "unverified"`. Reporter counts are distinct configured node IDs;
+physical independence is not established. Logs with missing identity fields
+increase `uncorrelatedEvents`, and cannot be interpreted as unique chain penalties.
+The existing Ban Detection UI and ban-wave API are unchanged by this collection
+stage. Legacy samples are not parsed or retrospectively promoted to v2 evidence.
 
 ## Storage
 
@@ -319,6 +424,7 @@ The server reads these variables once, at startup. Changing any of them requires
 | `NETWORK_NOISE_INGEST_TOKENS` | empty | Comma-separated `nodeId=token` entries, for example `fullnode-a=<token>,seed-a=<token>`. The first `=` splits each entry, and tokens cannot contain commas. The server silently ignores entries without `=` and tokens shorter than 32 characters |
 | `NETWORK_NOISE_OBSERVATION_TTL_DAYS` | `30` | Retention for stored observations, 1-365 days |
 | `NETWORK_NOISE_STALE_AFTER_MS` | `180000` | How long a node may go without reporting before it counts as stale, 60000-3600000 ms |
+| `POSE_OBSERVATION_TTL_DAYS` | `365` | Structured v2 PoSe/DKG observation retention from server receipt, 1–1825 days; separate from the legacy observation TTL |
 
 The server refuses to start if a value is invalid or out of range, or if the monitor is enabled without at least one valid token entry.
 
@@ -336,7 +442,110 @@ The following are not implemented:
 
 - request signing, nonces, or rejection of stale or future timestamps
 - detection of gaps in `sequence`
-- correlation of incidents across nodes, and alerting
+- correlation of legacy signals across nodes, and alerting (v2 structured candidate grouping is available)
+- full PoSe score/ban attribution in mixed or unsupported block contexts (restricted historical replay is available below)
 - access control or server-side redaction for the summary data
 - push updates (the page polls)
 - a reference node agent in this repository
+
+## Canonical commitment collector
+
+The independent collector stores verbose daemon blocks and every `type=6`
+commitment, including raw payloads when decoding or membership lookup is
+unavailable. It does not derive chain facts from agent logs. It supports mainnet
+Core v23.0.0, payload v1 and commitment v1–v4 according to the released
+[commitment serialization](https://github.com/defcon-project/defcon/blob/v23.0.0/src/llmq/commitment.h).
+It relies on the configured daemon's accepted chain, rather than independently
+verifying BLS signatures. Ordered `quorum info` members must match the payload's
+quorum hash/index, mined block, validity bits and unused trailing slots. Empty
+member slots are never counted as participating or penalized masternodes.
+
+The default start height is Q60 activation, but historical backfill runs only
+after opt-in. Each run collects a bounded contiguous prefix through the
+confirmation target, including blocks with no commitments. Block documents are
+unique by hash; a partial unique index permits only one canonical block at each
+height. A durable independent checkpoint advances after block persistence.
+Restarting replays any block written beyond that checkpoint. A changed checkpoint
+hash triggers an ancestor search, old-branch retraction and replacement replay.
+Orphan documents remain as fork evidence and are excluded from the public API.
+The block store has no TTL; log observations retain their existing independent TTL.
+
+Attribution is hidden during collection, errors, excessive reorg depth, stale
+checks and query-time collection generation changes. Excessive depth requires
+operator review and an appropriate depth setting before collection can recover.
+`ready` applies to the checked prefix, not a guarantee of full history or fresh
+agent coverage. A shorter confirmation target also excludes ineligible heights.
+
+Unavailable membership is retried from retained raw payloads in oldest-attempt
+order, within a separate block budget. Failure for one quorum never discards a
+different commitment's verified membership. No fallback guesses member identities
+when `quorum info` cannot provide them. Decoder slot counts remain available,
+while participants and invalid-member counts are zero until identities are verified.
+
+| Variable | Default | Range / purpose |
+| --- | --- | --- |
+| `POSE_CHAIN_COLLECTOR_ENABLED` | `false` | Explicit opt-in, independent of log ingest |
+| `POSE_CHAIN_START_HEIGHT` | `144888` | Positive integer; must match the stored checkpoint's start |
+| `POSE_CHAIN_BLOCKS_PER_RUN` | `50` | 1–200 new blocks per run |
+| `POSE_CHAIN_CONFIRMATIONS` | `3` | 1–100 confirmations, including the block itself |
+| `POSE_CHAIN_POLL_INTERVAL_MS` | `30000` | 10000–3600000 ms; first run after 15 seconds |
+| `POSE_CHAIN_REORG_MAX_DEPTH` | `128` | 1–10000 blocks of ancestor search |
+| `POSE_CHAIN_MEMBERSHIP_RETRY_BLOCKS` | `5` | 0–20 old blocks per run; 0 disables retries |
+
+Run exactly one collector process per database. In-process calls are single-flight;
+the checkpoint generation and compare-and-set guards are not a distributed lease.
+Review daemon load before enabling backfill: each block needs verbose data and
+canonicality rechecks, and each non-null commitment needs a membership lookup.
+Pruned block data prevents checkpoint advancement; unavailable historical quorum
+info permits raw commitment collection with explicitly unknown membership.
+
+The [canonical API](api.md#canonical-quorum-commitments) supplies coverage,
+membership and the separately enabled historical scoring evidence below.
+Complete historical coverage and the new Ban Detection UI remain further work.
+
+### Historical penalty and ban evidence
+
+`POSE_CHAIN_ATTRIBUTION_ENABLED=false` by default; opt-in adds a separate scoring
+budget, `POSE_CHAIN_ATTRIBUTION_BLOCKS_PER_RUN=5` (1–20 commitment blocks per run).
+This stage can fill scoring evidence for blocks already collected before it was
+enabled. Pending/unavailable blocks are attempted in oldest-attempt order.
+Commitment collection can remain ready while scoring has gaps.
+
+The replay rule is pinned to Core `a06830fd4281a1da989bb788fdd427566060d663`.
+It applies the released [PoSe processing order](https://github.com/defcon-project/defcon/blob/a06830fd4281a1da989bb788fdd427566060d663/src/evo/deterministicmns.cpp)
+and validates its result against both historical lists. The supported context
+has a complete verbose block with coinbase first, only transaction types 0/5/6,
+all non-null commitments' ordered memberships verified, and an unchanged registry.
+Provider registration/update/revoke, service or unknown transaction types,
+membership gaps and unexplained state changes never produce a causal claim.
+
+State snapshots use read-only `protx listdiff` with genesis and target **hashes**,
+as supported by the pinned [RPC implementation](https://github.com/defcon-project/defcon/blob/a06830fd4281a1da989bb788fdd427566060d663/src/rpc/evo.cpp).
+Both the parent and commitment block are queried. A valid response must have
+base height zero, the expected target height, full added-node states and no
+removed/updated entries. Only proTxHash, PoSe penalty/ban/revival and DSL ban height
+are stored; service addresses, operator keys and other raw RPC fields are discarded.
+Missing required historical fields or unavailable state remains explicitly unknown.
+These are daemon-derived state checks, not independently verified state-root proofs.
+
+Only a replay matching every registered node's selected state fields publishes
+applications and the exact commitment that causes a new PoSe ban. Valid members
+and former members absent from the registry produce no application. Prior PoSe
+or DSL bans cannot be attributed again as a new DKG ban. Historical snapshots and
+applications share the block's no-TTL retention and canonical/reorg lifecycle.
+Unsupported or inconsistent contexts retain a gap and require a future decoder
+or operator investigation; temporary state/membership availability is retried.
+The observation API remains unverified and never supplies missing historical scores.
+
+Review RPC and disk load before enabling this stage: each eligible attempt requests
+two full genesis-to-block lists plus canonicality checks. It does not access wallet
+RPCs or modify Core/evoDB state. Real historical availability and production load
+must be measured separately before enabling it on a deployed collector.
+
+Validation includes mined v23 fixtures, malformed/unsupported payloads, multiple
+commitments per block, unavailable membership retries, observer deduplication,
+reorgs and interrupted persistence/rollback recovery. The MongoDB integration
+suites run only with an explicit disposable
+`TEST_POSE_MONGO_URI=mongodb://127.0.0.1:<port>/deftrack_pose_test_<hex>`.
+The chain suite uses a separate database suffix and both suites drop only their
+isolated test databases. Build shared contracts before running the server tests.

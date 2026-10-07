@@ -1,14 +1,16 @@
 import crypto from 'node:crypto';
 import { Router, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { z } from 'zod';
-import { networkNoiseSummaryApiResponseSchema } from '@defcon/shared/dist/contracts';
+import {
+  networkNoiseSummaryApiResponseSchema,
+  networkNoiseIngestSchema,
+  poseEventsQuerySchema,
+  poseObservedEventsApiResponseSchema,
+} from '@defcon/shared/dist/contracts';
 import { config } from '../../config';
 import { withCachePolicy } from '../../middleware/cachePolicy';
-import {
-  networkNoiseService,
-  type NetworkNoisePayload,
-} from '../../services/networkNoise.service';
+import { networkNoiseService } from '../../services/networkNoise.service';
+import { poseTelemetryService } from '../../services/poseTelemetry.service';
 import { resolveRequestIp } from '../../utils/requestIp';
 import {
   firstValidationIssueMessage,
@@ -24,41 +26,6 @@ const ingestLimiter = rateLimit({
   standardHeaders: false,
   legacyHeaders: false,
   keyGenerator: (req) => resolveRequestIp(req, config.rateLimit.ipHeaders),
-});
-
-const nullableInt = z.number().int().nonnegative().nullable().optional();
-const nullableText = (max: number) => z.string().trim().max(max).nullable().optional();
-
-const signalSchema = z.object({
-  type: z.string().trim().min(1).max(64).regex(/^[a-z0-9_]+$/),
-  fingerprint: z.string().trim().min(8).max(128),
-  count: z.number().int().min(1).max(100000),
-  firstSeenAt: z.string().datetime({ offset: true }),
-  lastSeenAt: z.string().datetime({ offset: true }),
-  peerIps: z.array(z.string().ip()).max(20).optional(),
-  sample: nullableText(300),
-});
-
-const ingestSchema = z.object({
-  schemaVersion: z.literal(1),
-  agentVersion: z.string().trim().min(1).max(32),
-  nodeId: z.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9._-]+$/),
-  nodeRole: z.enum(['seed', 'fullnode', 'test_mn', 'masternode', 'unknown']),
-  observedAt: z.string().datetime({ offset: true }),
-  sequence: z.number().int().nonnegative(),
-  snapshot: z.object({
-    ip: z.string().ip(),
-    walletVersion: nullableText(64),
-    blockHeight: nullableInt,
-    bestBlockHash: nullableText(64),
-    chainLockHeight: nullableInt,
-    chainLockHash: nullableText(64),
-    connections: nullableInt,
-    inbound: nullableInt,
-    outbound: nullableInt,
-    syncing: z.boolean().nullable().optional(),
-  }),
-  signals: z.array(signalSchema).max(100),
 });
 
 function bearerToken(req: Request): string {
@@ -83,7 +50,7 @@ router.post('/ingest', ingestLimiter, async (req: Request, res: Response) => {
     });
   }
 
-  const parsed = ingestSchema.safeParse(req.body);
+  const parsed = networkNoiseIngestSchema.safeParse(req.body);
   if (!parsed.success) {
     return sendValidationError(res, firstValidationIssueMessage(parsed.error));
   }
@@ -98,13 +65,24 @@ router.post('/ingest', ingestLimiter, async (req: Request, res: Response) => {
   }
 
   try {
-    const result = await networkNoiseService.ingest(parsed.data as NetworkNoisePayload);
+    const result = await networkNoiseService.ingest(parsed.data);
     return res.status(result.duplicate ? 200 : 202).json({
       success: true,
       data: result,
     });
   } catch (error) {
     return sendInternalError(res, 'Failed to ingest network noise telemetry', error);
+  }
+});
+
+router.get('/pose-events', withCachePolicy('no-store'), async (req: Request, res: Response) => {
+  const parsed = poseEventsQuerySchema.safeParse(req.query);
+  if (!parsed.success) return sendValidationError(res, firstValidationIssueMessage(parsed.error));
+  try {
+    const data = await poseTelemetryService.getEvents(parsed.data);
+    return res.json(poseObservedEventsApiResponseSchema.parse({ success: true, data }));
+  } catch (error) {
+    return sendInternalError(res, 'Failed to load PoSe observations', error);
   }
 });
 

@@ -631,12 +631,20 @@ function WaveCard({ wave }: { wave: BanWaveDetail }) {
           {wave.uniqueCountries} countr{wave.uniqueCountries === 1 ? 'y' : 'ies'} |{' '}
           {wave.uniqueIps} IP{wave.uniqueIps === 1 ? '' : 's'} |{' '}
           {wave.uniqueOperators} operator{wave.uniqueOperators === 1 ? '' : 's'} | versions: {(wave.versions || []).slice(0, 3).join(', ') || 'not observed'}
+          {(wave.asnClusters?.[0]?.nodes ?? 0) >= 2 && <> | largest ASN cluster: {wave.asnClusters![0].nodes} nodes on AS{wave.asnClusters![0].asn}</>}
         </span>
         <span className="bd-wave-score">score {wave.severityScore}</span>
         <span className="bd-wave-toggle">{open ? '-' : '+'}</span>
       </button>
       {open && (
         <div className="bd-wave-body">
+          <div className="bd-wave-asn">
+            {(wave.asnClusters ?? []).filter(cluster => cluster.nodes >= 2).map(cluster =>
+              <p key={cluster.asn}>{cluster.nodes} affected nodes share AS{cluster.asn}
+                {cluster.organization ? ` (${cluster.organization})` : ''} · {cluster.sharePct}% of this wave.</p>)}
+            <p className="mnh-meta-line">ASN enrichment: {wave.asnKnownNodes ?? 'Unknown'} known,
+              {' '}{wave.asnUnknownNodes ?? 'Unknown'} unknown. Shared ASN is correlation, not proof of a shared operator or ban cause.</p>
+          </div>
           <div className="bd-wave-tags">
             {wave.countries.map((c) => (
               <span key={c} className="bd-country-tag">

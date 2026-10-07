@@ -193,6 +193,10 @@ export const banWaveDetailNodeSchema = z.object({
 });
 
 export const banWaveDetailSchema = z.object({
+  asnClusters: z.array(z.object({ asn: nonNegativeInteger.positive(), organization: nullableText,
+    nodes: nonNegativeInteger.positive(), sharePct: finiteNumber.min(0).max(100) })).optional(),
+  asnKnownNodes: nonNegativeInteger.optional(),
+  asnUnknownNodes: nonNegativeInteger.optional(),
   id: z.string().min(1),
   startedAt: isoDateTime,
   endedAt: isoDateTime,

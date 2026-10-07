@@ -328,6 +328,18 @@ export function loadConfig(env: Environment = process.env) {
       ),
     },
 
+    poseChain: {
+      enabled: parseBoolEnv(env, 'POSE_CHAIN_COLLECTOR_ENABLED', false, issues),
+      startHeight: parseIntEnv(env, 'POSE_CHAIN_START_HEIGHT', 144888, issues, { min: 1 }),
+      blocksPerRun: parseIntEnv(env, 'POSE_CHAIN_BLOCKS_PER_RUN', 50, issues, { min: 1, max: 200 }),
+      confirmations: parseIntEnv(env, 'POSE_CHAIN_CONFIRMATIONS', 3, issues, { min: 1, max: 100 }),
+      intervalMs: parseIntEnv(env, 'POSE_CHAIN_POLL_INTERVAL_MS', 30000, issues, { min: 10000, max: 3600000 }),
+      reorgMaxDepth: parseIntEnv(env, 'POSE_CHAIN_REORG_MAX_DEPTH', 128, issues, { min: 1, max: 10000 }),
+      membershipRetryBlocks: parseIntEnv(env, 'POSE_CHAIN_MEMBERSHIP_RETRY_BLOCKS', 5, issues, { min: 0, max: 20 }),
+      attributionEnabled: parseBoolEnv(env, 'POSE_CHAIN_ATTRIBUTION_ENABLED', false, issues),
+      attributionBlocksPerRun: parseIntEnv(env, 'POSE_CHAIN_ATTRIBUTION_BLOCKS_PER_RUN', 5, issues, { min: 1, max: 20 }),
+    },
+
     networkNoise: {
       enabled: networkNoiseEnabled,
       ingestTokens: networkNoiseTokens,
@@ -341,6 +353,10 @@ export function loadConfig(env: Environment = process.env) {
       staleAfterMs: parseIntEnv(env, 'NETWORK_NOISE_STALE_AFTER_MS', 180000, issues, {
         min: 60000,
         max: 3600000,
+      }),
+      poseObservationTtlDays: parseIntEnv(env, 'POSE_OBSERVATION_TTL_DAYS', 365, issues, {
+        min: 1,
+        max: 1825,
       }),
     },
 

@@ -1,8 +1,11 @@
 import crypto from 'node:crypto';
+import type { NetworkNoiseIngestPayload } from '@defcon/shared/dist/contracts';
 import { config } from '../config';
 import { NetworkNoiseNodeState } from '../models/NetworkNoiseNodeState';
 import { NetworkNoiseObservation } from '../models/NetworkNoiseObservation';
 import { logger } from '../utils/logger';
+import { isDuplicateKeyOnly } from '../domain/pose/poseTelemetry';
+import { poseTelemetryService } from './poseTelemetry.service';
 
 export type NetworkNoiseRole = 'seed' | 'fullnode' | 'test_mn' | 'masternode' | 'unknown';
 
@@ -16,27 +19,7 @@ export type NetworkNoiseSignalInput = {
   sample?: string | null;
 };
 
-export type NetworkNoisePayload = {
-  schemaVersion: number;
-  agentVersion: string;
-  nodeId: string;
-  nodeRole: NetworkNoiseRole;
-  observedAt: string;
-  sequence: number;
-  snapshot: {
-    ip: string;
-    walletVersion?: string | null;
-    blockHeight?: number | null;
-    bestBlockHash?: string | null;
-    chainLockHeight?: number | null;
-    chainLockHash?: string | null;
-    connections?: number | null;
-    inbound?: number | null;
-    outbound?: number | null;
-    syncing?: boolean | null;
-  };
-  signals: NetworkNoiseSignalInput[];
-};
+export type NetworkNoisePayload = NetworkNoiseIngestPayload;
 
 const SIGNAL_WEIGHTS: Record<string, number> = {
   chainlock_conflict: 18,
@@ -88,6 +71,7 @@ class NetworkNoiseService {
     duplicate: boolean;
     acceptedSignals: number;
     noiseScore: number;
+    acceptedPoseObservations?: number;
   }> {
     const current = await NetworkNoiseNodeState.findOne({ nodeId: payload.nodeId })
       .select({ lastSequence: 1 })
@@ -98,6 +82,7 @@ class NetworkNoiseService {
         duplicate: true,
         acceptedSignals: 0,
         noiseScore: 0,
+        ...(payload.schemaVersion === 2 ? { acceptedPoseObservations: 0 } : {}),
       };
     }
 
@@ -145,10 +130,14 @@ class NetworkNoiseService {
       } catch (error) {
         // Concurrent retries can race on the unique dedupe key. The state
         // update below is still safe, and duplicate observations are ignored.
-        const code = (error as { code?: number }).code;
-        if (code !== 11000) throw error;
+        if (!isDuplicateKeyOnly(error)) throw error;
       }
     }
+
+    // Complete both stores before advancing the sequence. A failed PoSe write
+    // remains retryable; all already written observations have stable keys.
+    const acceptedPoseObservations = payload.schemaVersion === 2
+      ? await poseTelemetryService.ingest(payload) : undefined;
 
     const stateUpdate: Record<string, unknown> = {
       nodeRole: payload.nodeRole,
@@ -169,7 +158,7 @@ class NetworkNoiseService {
       signalCount,
       activeSignalTypes,
     };
-    if (payload.signals.length === 0) {
+    if (payload.signals.length === 0 && (payload.schemaVersion === 1 || payload.poseEvents.length === 0)) {
       stateUpdate.lastCleanAt = observedAt;
     }
 
@@ -186,6 +175,7 @@ class NetworkNoiseService {
       duplicate: false,
       acceptedSignals: payload.signals.length,
       noiseScore,
+      ...(acceptedPoseObservations !== undefined ? { acceptedPoseObservations } : {}),
     };
   }
 

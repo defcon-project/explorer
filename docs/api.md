@@ -151,6 +151,55 @@ Agents running next to monitored nodes push observations to `POST /api/v1/networ
 per-node bearer token; `GET /api/v1/network-noise/summary` feeds the Network Noise Monitor page. Ingest is
 disabled unless `NETWORK_NOISE_MONITOR_ENABLED=true`. The contract and scoring are in
 [`network-noise-monitor.md`](network-noise-monitor.md).
+Both v1 batches and v2 batches with structured `poseEvents` are accepted. Public
+`GET /api/v1/network-noise/pose-events` provides paginated, filterable observation
+candidates with separate event/observer counts. Its evidence remains `log_observed`
+and `unverified`; this collector does not establish canonical PoSe attribution.
+
+## Canonical quorum commitments
+
+`GET /api/v1/masternodes/pose-chain` is a public, rate-limited, no-store endpoint
+for the opt-in v23 mainnet commitment collector. Query parameters: `hours` (1–8760,
+default 24), `page` (1–10000, default 1), `limit` (1–50, default 10), optional
+`quorumType` (0–255) and `proTxHash` (64 hex characters, normalized to lowercase).
+
+The response separates `coverage`, quorum summaries and paginated commitments.
+`ready` means the collected prefix passed canonicality checks; use
+`coverage.caughtUp`, `remainingBlocks` and `confirmedThroughHeight` to assess
+backfill progress. Disabled, collecting, unavailable or stale collectors return
+coverage with empty evidence arrays. A reorg or collection generation change
+during a query also suppresses the evidence.
+
+Each commitment reports its block/transaction, quorum type/base/index, version,
+`membershipStatus`, participant and invalid-member counts, and observer counts.
+`chain_verified_membership` means ordered RPC member identities agree with the
+mined payload's validity bitset. It does not by itself establish a ban, reconstruct
+old PoSe scores, or explain why a DKG member was invalid. `membership_unavailable`
+and `unsupported_payload` remain `unknown`; decoded `memberSlots`/`invalidSlots`
+are bitset sizes, not counts of actual masternodes. Null commitments have no
+participants. Observer counts use exact block/height/type/base/member matches
+from unexpired, non-future penalty, ban or DKG observations and deduplicate node
+IDs. Those observations retain their separate unverified evidence status.
+
+With the separately enabled historical scoring stage, `penaltyCoverage` reports
+verified, pending, unavailable, unsupported and inconsistent commitment blocks
+across the entire confirmed collected prefix (not just the requested time window).
+Commitment backfill completion does not imply penalty backfill completion.
+Each row carries `penaltyAttributionStatus` and a generic gap reason. Per-member
+`penaltyEvidence=chain_verified_penalty` requires verified membership and a
+complete supported block replay matching historical state. `penalty` then gives
+the previous block's score, the score immediately before/after this commitment,
+nominal amount, actual signed delta, cap and ban heights. `causedBan=true` belongs
+only to the commitment that first reaches the cap for an unbanned node. A valid
+member or one absent from the unchanged registry is `not_applicable` with an
+explicit `penaltyReason`; an unverified cause remains `unknown` and `penalty=null`.
+Quorum summaries distinguish rule applications (including capped zero deltas),
+new bans and unknown penalty commitments. The `proTxHash` filter selects whole
+commitments containing that member; summary counts still describe those complete
+commitments. A DKG punishment does not explain the underlying participation fault.
+
+Configuration, retention and collector constraints are described in
+[`network-noise-monitor.md`](network-noise-monitor.md#canonical-commitment-collector).
 
 ## AI endpoints and MCP
 

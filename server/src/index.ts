@@ -16,6 +16,7 @@ import { masternodePollerService } from './services/masternodePoller.service';
 import { networkHealthService } from './services/networkHealth.service';
 import { seedNodeService } from './services/seedNode.service';
 import { nodeInventoryService } from './services/nodeInventory.service';
+import { poseChainService } from './services/poseChain.service';
 import { cachePrewarmService } from './services/cachePrewarm.service';
 import { realtimeService } from './services/realtime.service';
 import { telegramService } from './services/telegram.service';
@@ -222,6 +223,7 @@ function startBackgroundServices(reason: string): void {
     logger.error(`Failed to start node inventory scanner (${reason}):`, err);
   });
   cachePrewarmService.start();
+  poseChainService.start().catch(() => logger.warn('PoSe chain collector could not start'));
   telegramService.start();
 }
 
@@ -460,6 +462,7 @@ async function stopServices(): Promise<void> {
     syncService.stop(),
     masternodePollerService.stop(),
     nodeInventoryService.stop(),
+    poseChainService.stop(),
     realtimeService.shutdown(),
   ]);
 }

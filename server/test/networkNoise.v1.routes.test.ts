@@ -2,15 +2,18 @@ import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../src/config';
+import { poseEvent, posePayload } from './fixtures/poseTelemetry';
 
 const mocks = vi.hoisted(() => ({
   ingest: vi.fn(),
   getSummary: vi.fn(),
 }));
+const poseMocks = vi.hoisted(() => ({ getEvents: vi.fn() }));
 
 vi.mock('../src/services/networkNoise.service', () => ({
   networkNoiseService: mocks,
 }));
+vi.mock('../src/services/poseTelemetry.service', () => ({ poseTelemetryService: poseMocks }));
 
 import networkNoiseRoutes from '../src/routes/v1/networkNoise.v1.routes';
 
@@ -157,5 +160,65 @@ describe('network noise v1 routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(mocks.getSummary).toHaveBeenCalledWith(24);
+  });
+
+  it('accepts v2 PoSe data through the same per-node authentication', async () => {
+    mocks.ingest.mockResolvedValue({ duplicate: false, acceptedSignals: 0, noiseScore: 0, acceptedPoseObservations: 1 });
+    const response = await request(app).post('/api/v1/network-noise/ingest')
+      .set('Authorization', `Bearer ${TOKEN}`).send(posePayload());
+    expect(response.status).toBe(202);
+    expect(response.body.data.acceptedPoseObservations).toBe(1);
+    expect(mocks.ingest).toHaveBeenCalledWith(posePayload());
+  });
+
+  it('rejects malformed structured data and excessive samples before storage', async () => {
+    const response = await request(app).post('/api/v1/network-noise/ingest')
+      .set('Authorization', `Bearer ${TOKEN}`)
+      .send(posePayload({ poseEvents: [poseEvent({ eventBlockHash: 'not-a-hash' })] }));
+    expect(response.status).toBe(400);
+    expect(mocks.ingest).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unauthorized structured batch', async () => {
+    const response = await request(app).post('/api/v1/network-noise/ingest')
+      .set('Authorization', 'Bearer wrong').send(posePayload());
+    expect(response.status).toBe(401);
+    expect(mocks.ingest).not.toHaveBeenCalled();
+  });
+
+  it('keeps duplicate v2 batches at 200', async () => {
+    mocks.ingest.mockResolvedValue({ duplicate: true, acceptedSignals: 0, noiseScore: 0, acceptedPoseObservations: 0 });
+    const response = await request(app).post('/api/v1/network-noise/ingest')
+      .set('Authorization', `Bearer ${TOKEN}`).send(posePayload());
+    expect(response.status).toBe(200);
+    expect(response.body.data.acceptedPoseObservations).toBe(0);
+  });
+
+  it('returns paginated observed-only data with no cache', async () => {
+    poseMocks.getEvents.mockResolvedValue({
+      generatedAt: '2026-10-06T12:00:00Z', windowHours: 24, retentionDays: 365,
+      page: 2, limit: 10, total: 0, observationCount: 0, uncorrelatedEvents: 0, chainVerifiedEvents: 0, events: [],
+    });
+    const response = await request(app).get('/api/v1/network-noise/pose-events?page=2&limit=10&quorumType=7');
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toContain('no-store');
+    expect(poseMocks.getEvents).toHaveBeenCalledWith({ hours: 24, page: 2, limit: 10, quorumType: 7 });
+    expect(response.body.data.chainVerifiedEvents).toBe(0);
+  });
+
+  it.each(['limit=101', 'page=0', 'hours=8761', 'kind=invalid', 'quorumType=256', 'proTxHash=bad'])
+    ('rejects an invalid PoSe event query: %s', async (query) => {
+      const response = await request(app).get(`/api/v1/network-noise/pose-events?${query}`);
+      expect(response.status).toBe(400);
+      expect(poseMocks.getEvents).not.toHaveBeenCalled();
+    });
+
+  it('does not publish a falsely chain-verified service response', async () => {
+    poseMocks.getEvents.mockResolvedValue({
+      generatedAt: '2026-10-06T12:00:00Z', windowHours: 24, retentionDays: 365,
+      page: 1, limit: 50, total: 0, observationCount: 0, uncorrelatedEvents: 0, chainVerifiedEvents: 1, events: [],
+    });
+    const response = await request(app).get('/api/v1/network-noise/pose-events');
+    expect(response.status).toBe(500);
   });
 });

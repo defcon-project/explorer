@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { OperatorDiagnosisData } from '@defcon/shared/dist/contracts';
 import type {
   ActiveMasternodeVersionsView,
   AddressBalanceView,
@@ -334,6 +335,11 @@ export async function fetchMasternodeEvents(opts: {
   const { data } = await api.get<ApiEnvelope<MasternodeEventsView>>('/v1/masternodes/events', {
     params,
   });
+  return data.data;
+}
+
+export async function fetchOperatorDiagnosis() {
+  const { data } = await api.get<ApiEnvelope<OperatorDiagnosisData>>('/v1/masternodes/operator-diagnosis');
   return data.data;
 }
 

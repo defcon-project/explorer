@@ -13,6 +13,7 @@ import networkNoiseV1Routes from './networkNoise.v1.routes';
 import migrationRoutes from '../migration.routes';
 import { config } from '../../config';
 import poseChainRoutes from './poseChain.v1.routes';
+import operatorDiagnosisRoutes from './operatorDiagnosis.v1.routes';
 import { resolveRequestIp } from '../../utils/requestIp';
 
 const router = Router();
@@ -32,9 +33,11 @@ const heavyEndpointLimiter = rateLimit({
 router.use('/masternodes/health', heavyEndpointLimiter);
 router.use('/masternodes/ban-waves', heavyEndpointLimiter);
 router.use('/masternodes/pose-chain', heavyEndpointLimiter);
+router.use('/masternodes/operator-diagnosis', heavyEndpointLimiter);
 router.use('/address/:address/graph', heavyEndpointLimiter);
 router.use('/address/:address/rewards', heavyEndpointLimiter);
 
+router.use('/masternodes', operatorDiagnosisRoutes);
 router.use('/masternodes', masternodeV1Routes);
 router.use('/masternodes', poseChainRoutes);
 router.use('/network', networkV1Routes);

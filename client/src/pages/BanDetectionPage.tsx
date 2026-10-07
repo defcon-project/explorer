@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { OperatorDiagnosisPanel, nodePermalink } from '../components/OperatorDiagnosisPanel';
 import {
   HiOutlineFire,
   HiOutlineBolt,
@@ -107,14 +108,18 @@ function waveNodeStatusLabel(status?: string): string {
 }
 
 export function BanDetectionPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [windowKey, setWindowKey] = useState<WindowKey>('q60');
   const [windowMinutes, setWindowMinutes] = useState(30);
   const [minNodes, setMinNodes] = useState(3);
   const [timelineMode, setTimelineMode] = useState<TimelineMode>('fresh');
   const [paused, setPaused] = useState<boolean>(false);
   const [focusChart, setFocusChart] = useState(false);
-  const [nodeFilter, setNodeFilter] = useState('');
-  const [repeatsOnly, setRepeatsOnly] = useState(true);
+  const nodeFilter = searchParams.get('node') ?? '';
+  const setNodeFilter = (value: string) => { const next = new URLSearchParams(searchParams);
+    if (value) next.set('node', value); else next.delete('node');
+    setSearchParams(next, { replace: true }); };
+  const [repeatsOnly, setRepeatsOnly] = useState(false);
   const isPageVisible = usePageVisibility();
   const chartAnimation = useChartAnimation();
 
@@ -542,7 +547,7 @@ export function BanDetectionPage() {
           <table className="mnh-table">
             <thead><tr><th>Node / Service</th><th>Ban events</th><th>Last ban block</th><th>Last event</th><th>Recorded recovery</th><th>Current state</th><th>Penalty</th></tr></thead>
             <tbody>{visibleNodes.map((node) => <tr key={node.proTxHash || node.nodeId}>
-              <td className="mnh-mono"><div>{node.service || 'Unknown service'}</div><div title={node.proTxHash || node.nodeId} className="mnh-meta-line">{truncateHash(node.proTxHash || node.nodeId, 8)}</div></td>
+              <td className="mnh-mono"><Link to={nodePermalink(node.proTxHash || node.service || node.nodeId)}>{node.service || 'Unknown service'}</Link><div title={node.proTxHash || node.nodeId} className="mnh-meta-line">{truncateHash(node.proTxHash || node.nodeId, 8)}</div></td>
               <td>{node.banCount}</td>
               <td>{node.lastBanHeight != null ? <Link to={`/block/${node.lastBanHeight}`}>{formatNumber(node.lastBanHeight)}</Link> : 'Unknown'}</td>
               <td>{new Date(node.lastBanAt).toLocaleString()}</td>
@@ -554,6 +559,8 @@ export function BanDetectionPage() {
         </div>
         {visibleNodes.length === 0 && <div className="mnh-empty">{isLoading ? 'Loading…' : !data ? 'Node history unavailable.' : repeatsOnly ? 'No repeated bans match this period and search. Uncheck “Repeated bans only” to view isolated events.' : 'No confirmed bans match this period and search.'}</div>}
       </section>
+
+      <OperatorDiagnosisPanel filter={nodeFilter} paused={paused || !isPageVisible} />
 
       {/* Wave list */}
       <section className="mnh-panel">

@@ -183,7 +183,7 @@ IDs. Those observations retain their separate unverified evidence status.
 
 With the separately enabled historical scoring stage, `penaltyCoverage` reports
 verified, pending, unavailable, unsupported and inconsistent commitment blocks
-across the entire confirmed collected prefix (not just the requested time window).
+within the requested time and height window of the confirmed collected prefix.
 Commitment backfill completion does not imply penalty backfill completion.
 Each row carries `penaltyAttributionStatus` and a generic gap reason. Per-member
 `penaltyEvidence=chain_verified_penalty` requires verified membership and a

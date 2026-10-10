@@ -5,6 +5,31 @@ test.beforeEach(async ({ page }) => {
   await stubApi(page);
 });
 
+test('navigation cleanup keeps block browsing and redirects the retired wallet page @smoke', async ({ page }, testInfo) => {
+  await page.goto('/blocks');
+  await expect(page.getByRole('heading', { name: 'Latest DeFCoN Blocks' })).toBeVisible();
+  const footer = page.getByRole('navigation', { name: 'Footer links' });
+  await expect(footer.locator('a[href="/blocks"], a[href="/wallets"]')).toHaveCount(0);
+  await page.goto('/wallets');
+  await expect(page).toHaveURL(/\/richlist$/);
+  await expect(page.getByRole('heading', { name: 'Rich List', exact: true })).toBeVisible();
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/richlist$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/blocks$/);
+  if (testInfo.project.name === 'mobile-chromium') {
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    const nav = page.getByRole('navigation', { name: 'Primary navigation' });
+    await expect(nav.getByRole('link', { name: 'Latest Blocks', exact: true })).toHaveCount(0);
+    await expect(nav.getByRole('link', { name: 'Top Wallets', exact: true })).toHaveCount(0);
+    await nav.getByRole('link', { name: 'Rich List', exact: true }).click();
+    await expect(page).toHaveURL(/\/richlist$/);
+  }
+  await page.goto('/');
+  await page.locator('.latest-card').filter({ has: page.getByRole('heading', { name: 'Latest Blocks', exact: true }) })
+    .getByRole('link', { name: 'View all' }).click();
+  await expect(page).toHaveURL(/\/blocks$/);
+});
+
 test('desktop primary and dropdown navigation preserve their routes @smoke', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'Desktop navigation is covered in the desktop project.');
 
@@ -23,9 +48,11 @@ test('desktop primary and dropdown navigation preserve their routes @smoke', asy
   await primaryNavigation.getByRole('button', { name: 'Explorer', exact: true }).click();
   await expect(primaryNavigation.getByRole('menuitem', { name: 'Mempool', exact: true })).toHaveCount(0);
   await expect(primaryNavigation.getByRole('menuitem', { name: 'Wallet Distribution', exact: true })).toHaveCount(0);
-  await primaryNavigation.getByRole('menuitem', { name: 'Latest Blocks', exact: true }).click();
-  await expect(page).toHaveURL(/\/blocks$/);
-  await expect(page.getByRole('heading', { name: 'Latest DeFCoN Blocks' })).toBeVisible();
+  await expect(primaryNavigation.getByRole('menuitem', { name: 'Latest Blocks', exact: true })).toHaveCount(0);
+  await expect(primaryNavigation.getByRole('menuitem', { name: 'Top Wallets', exact: true })).toHaveCount(0);
+  await primaryNavigation.getByRole('menuitem', { name: 'Transactions', exact: true }).click();
+  await expect(page).toHaveURL(/\/txs$/);
+  await expect(page.getByRole('heading', { name: 'Latest DEFCON Transactions' })).toBeVisible();
 
   await primaryNavigation.getByRole('button', { name: 'Dev Tools', exact: true }).click();
   await primaryNavigation.getByRole('menuitem', { name: 'Node Inventory', exact: true }).click();

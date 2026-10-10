@@ -24,6 +24,7 @@ describe('shared route SEO metadata', () => {
   });
 
   it('uses the redirect target as the canonical URL', () => {
+    expect(resolveRouteSeo('/wallets/')).toEqual(resolveRouteSeo('/richlist'));
     expect(resolveRouteSeo('/crawler')).toMatchObject({
       canonicalPath: '/chain-health',
       title: expect.stringContaining('Node Monitor'),

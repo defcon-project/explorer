@@ -20,7 +20,7 @@ node monitoring.
 
 | | |
 |---|---|
-| Chain | Blocks, transactions, addresses, top wallets, rich list, mempool and search |
+| Chain | Blocks, transactions, addresses, rich list, mempool and search |
 | Rewards | Network rewards, masternode income and ROI estimates, network economics |
 | Masternodes | Masternode list, MN Health, provider and country distribution, provider tags |
 | PoSe | PoSe Watch (ban-wave detection) and PoSe Penalty Watch |

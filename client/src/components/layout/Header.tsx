@@ -45,14 +45,12 @@ const DEV_TOOLS_NAV_ITEM: HeaderNavItem = {
 const NAV_ITEMS: HeaderNavItem[] = [
   { path: '/', label: 'Dashboard', icon: HiOutlineSquares2X2, end: true },
   {
-    path: '/blocks',
+    path: '/txs',
     label: 'Explorer',
     icon: HiOutlineCube,
-    aliases: ['/block', '/tx', '/txs', '/search', '/searchv2', '/address', '/wallets', '/richlist', '/mempool', '/bubblemaps'],
+    aliases: ['/blocks', '/block', '/tx', '/search', '/searchv2', '/address', '/richlist', '/mempool', '/bubblemaps'],
     children: [
-      { path: '/blocks', label: 'Latest Blocks' },
       { path: '/txs', label: 'Transactions' },
-      { path: '/wallets', label: 'Top Wallets' },
       { path: '/richlist', label: 'Rich List' },
     ],
   },

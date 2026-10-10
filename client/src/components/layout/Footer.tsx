@@ -83,8 +83,6 @@ export default function Footer() {
 
           <nav className="footer-links" aria-label="Footer links">
             <Link to="/">Dashboard</Link>
-            <Link to="/blocks">Blocks</Link>
-            <Link to="/wallets">Wallets</Link>
             <Link to="/mining">Rewards</Link>
             <Link to="/network">Network</Link>
             <Link to="/chain-health">Nodes</Link>

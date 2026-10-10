@@ -13,7 +13,6 @@ const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
 const TransactionPage = lazy(() => import('./pages/TransactionPage'));
 const AddressPage = lazy(() => import('./pages/AddressPage'));
 const RichListPage = lazy(() => import('./pages/RichListPage'));
-const TopWalletsPage = lazy(() => import('./pages/TopWalletsPage'));
 const MiningPage = lazy(() => import('./pages/MiningPage'));
 const BubblemapsPage = lazy(() => import('./pages/BubblemapsPage'));
 const NetworkPage = lazy(() => import('./pages/NetworkPage'));
@@ -76,7 +75,7 @@ export default function App() {
         <Route path="tx/:txid" element={withSuspense(<TransactionPage />)} />
         <Route path="address/:address" element={withSuspense(<AddressPage />)} />
         <Route path="richlist" element={withSuspense(<RichListPage />)} />
-        <Route path="wallets" element={withSuspense(<TopWalletsPage />)} />
+        <Route path="wallets" element={<Navigate to="/richlist" replace />} />
         <Route path="mining" element={withSuspense(<MiningPage />)} />
         <Route path="bubblemaps" element={withSuspense(<BubblemapsPage />)} />
         <Route path="network" element={withSuspense(<NetworkPage />)} />

@@ -4,6 +4,7 @@ export * from './nodeMonitoring';
 export * from './pose';
 export * from './poseTelemetry';
 export * from './poseChain';
+export * from './banAttribution';
 export * from './operatorDiagnosis';
 export * from './search';
 export * from './stats';

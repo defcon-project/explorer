@@ -465,6 +465,21 @@ export const openApiDocument: OpenApiDocument = {
         },
       },
     },
+    '/api/v1/masternodes/ban-attribution': {
+      get: {
+        tags: ['V1', 'Masternodes'],
+        summary: 'Verified BANNED_BY evidence for one identity and ban block',
+        description: 'No-store, read-only lookup. Unknown is not evidence of no ban. Verified scoring does not explain the DKG fault.',
+        parameters: [
+          { name: 'proTxHash', in: 'query', required: true, schema: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' } },
+          { name: 'banHeight', in: 'query', required: true, schema: { type: 'integer', minimum: 1, maximum: 2147483647 } },
+          { name: 'blockHash', in: 'query', description: 'Optional canonical hash pin; a mismatch suppresses evidence.',
+            schema: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' } },
+        ],
+        responses: { 200: openApiSuccessResponse('BanAttributionApiResponse'),
+          400: OpenApiResponses.badRequest, 500: OpenApiResponses.internalError },
+      },
+    },
     '/api/v1/masternodes/ban-waves': {
       get: {
         tags: ['V1', 'Masternodes'],

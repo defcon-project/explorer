@@ -2,6 +2,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
   activeMasternodeVersionsApiResponseSchema,
   banWaveAnalysisApiResponseSchema,
+  banAttributionApiResponseSchema,
   masternodeApiResponseSchema,
   masternodeDistributionApiResponseSchema,
   masternodeEventsApiResponseSchema,
@@ -35,7 +36,8 @@ export type OpenApiContractName =
   | 'NodeInventoryApiResponse'
   | 'MasternodeEventsApiResponse'
   | 'MasternodeHealthApiResponse'
-  | 'BanWaveAnalysisApiResponse';
+  | 'BanWaveAnalysisApiResponse'
+  | 'BanAttributionApiResponse';
 
 function toOpenApiSchema(schema: unknown): OpenApiSchema {
   return convertToOpenApiSchema(schema, {
@@ -60,6 +62,7 @@ export const openApiContractSchemas: Record<OpenApiContractName, OpenApiSchema> 
   MasternodeEventsApiResponse: toOpenApiSchema(masternodeEventsApiResponseSchema),
   MasternodeHealthApiResponse: toOpenApiSchema(masternodeHealthApiResponseSchema),
   BanWaveAnalysisApiResponse: toOpenApiSchema(banWaveAnalysisApiResponseSchema),
+  BanAttributionApiResponse: toOpenApiSchema(banAttributionApiResponseSchema),
 };
 
 export function openApiContractRef(name: OpenApiContractName) {

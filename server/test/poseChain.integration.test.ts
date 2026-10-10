@@ -1,12 +1,13 @@
 import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { poseChainDataSchema, poseChainQuerySchema } from '@defcon/shared/dist/contracts';
+import { poseChainDataSchema, poseChainQuerySchema, banAttributionDataSchema } from '@defcon/shared/dist/contracts';
 import { config } from '../src/config';
 import { PoseChainBlock } from '../src/models/PoseChainBlock';
 import { PoseChainState } from '../src/models/PoseChainState';
 import { PoseObservation } from '../src/models/PoseObservation';
 import { PoseChainService } from '../src/services/poseChain.service';
 import { getPoseChainData } from '../src/services/poseChainQuery.service';
+import { getBanAttribution } from '../src/services/banAttribution.service';
 import { poseTelemetryService } from '../src/services/poseTelemetry.service';
 import { chainHash, commitmentPayload } from './fixtures/poseChain';
 import { poseEvent, posePayload } from './fixtures/poseTelemetry';
@@ -492,5 +493,55 @@ describe.skipIf(!baseUri)('canonical PoSe collection with disposable MongoDB', (
     expect(data.quorumSummary.find((row) => row.quorumType === 7)).toMatchObject({ newBans: 0 });
     expect(data.quorumSummary.find((row) => row.quorumType === 2)).toMatchObject({ newBans: 1 });
     expect(poseChainDataSchema.safeParse(data).success).toBe(true);
+    const ban = await getBanAttribution({ proTxHash: chainHash(2), banHeight: 100 });
+    expect(ban).toMatchObject({ status: 'verified', proof: { txid: chainHash(30000), quorumType: 2,
+      penalty: { beforePenalty: 66, afterPenalty: 100, appliedDelta: 34 } } });
+    expect(banAttributionDataSchema.safeParse(ban).success).toBe(true);
+  });
+
+  it('counts exact observers separately and permits a verified ban in a partial collected prefix', async () => {
+    enablePenaltyEvidence(); config.poseChain.blocksPerRun = 1; await service.collectOnce();
+    const commitment = blocks.get(100)!.tx[1];
+    const event = poseEvent({ eventAt: new Date(Date.now() - 1000).toISOString(), kind: 'ban',
+      eventBlockHash: chainHash(100), eventBlockHeight: 100, quorumType: 7, quorumHash: chainHash(1000),
+      proTxHash: chainHash(2), poseBanHeight: 100 });
+    for (let i = 0; i < 12; i++) await poseTelemetryService.ingest(posePayload({ nodeId: `ban-observer-${i}`, poseEvents: [event] }));
+    await poseTelemetryService.ingest(posePayload({ nodeId: 'ban-observer-0', sequence: 99,
+      poseEvents: [{ ...event, kind: 'penalty_change', eventId: 'same-node-again' }] }));
+    const variations = [{ eventBlockHash: chainHash(999) }, { eventBlockHeight: 101 }, { quorumType: 2 },
+      { quorumHash: chainHash(999) }, { proTxHash: chainHash(1) }, { kind: 'recovery' as const },
+      { eventAt: new Date(Date.now() + 3600000).toISOString() }];
+    for (let i = 0; i < variations.length; i++) await poseTelemetryService.ingest(posePayload({
+      nodeId: `wrong-ban-observer-${i}`, poseEvents: [{ ...event, ...variations[i] }] }));
+    await poseTelemetryService.ingest(posePayload({ nodeId: 'expired-ban-observer', poseEvents: [event] }));
+    await PoseObservation.updateMany({ nodeId: 'expired-ban-observer' }, { $set: { expiresAt: new Date(Date.now() - 1) } });
+    const countsBefore = await PoseChainBlock.countDocuments();
+    const ban = await getBanAttribution({ proTxHash: chainHash(2), banHeight: 100 });
+    expect(ban).toMatchObject({ status: 'verified', coverage: { caughtUp: false, confirmedThroughHeight: 100 },
+      proof: { txid: commitment.txid, quorumType: 7, observerCount: 12 } });
+    expect(banAttributionDataSchema.safeParse(ban).success).toBe(true);
+    expect(await PoseChainBlock.countDocuments()).toBe(countsBefore);
+    expect(await getBanAttribution({ proTxHash: chainHash(1), banHeight: 100 })).toMatchObject({
+      status: 'unknown', reason: 'ban_not_attributed', proof: null });
+    expect(await getBanAttribution({ proTxHash: chainHash(2), banHeight: 101 })).toMatchObject({
+      status: 'unknown', reason: 'after_coverage', proof: null });
+  });
+
+  it('retracts a pinned orphan ban and suppresses altered stored state despite a verified label', async () => {
+    const snapshots = enablePenaltyEvidence(); await service.collectOnce();
+    const query = { proTxHash: chainHash(2), banHeight: 100, blockHash: chainHash(100) };
+    expect((await getBanAttribution(query)).status).toBe('verified');
+    for (const height of [100, 101, 102]) {
+      blocks.set(height, block(height, 1));
+      blocks.get(height)!.tx.unshift({ txid: chainHash(60000 + height), type: 5, vin: [{ coinbase: '01' }] });
+      snapshots.set(blocks.get(height)!.hash, { height, penalty: 100, banHeight: 100 });
+    }
+    await service.collectOnce();
+    expect(await getBanAttribution(query)).toMatchObject({ status: 'unknown', reason: 'block_hash_mismatch', proof: null });
+    const canonical = await getBanAttribution({ ...query, blockHash: chainHash(1100) });
+    expect(canonical).toMatchObject({ status: 'verified', proof: { blockHash: chainHash(1100) } });
+    await PoseChainBlock.updateOne({ canonical: true, height: 100 }, { $set: { 'penaltyAttribution.after.0.penalty': 1 } });
+    expect(await getBanAttribution({ proTxHash: chainHash(2), banHeight: 100 })).toMatchObject({
+      status: 'unknown', reason: 'inconsistent', proof: null });
   });
 });

@@ -11,6 +11,7 @@ const penaltyApplicationSchema = z.object({
   penaltyAmount: integer, appliedDelta: z.number().int(), maxPenalty: z.number().int().min(100),
   previousBanHeight: z.number().int().min(-1), banHeight: z.number().int().min(-1), causedBan: z.boolean(),
 });
+export const posePenaltyApplicationSchema = penaltyApplicationSchema;
 export const poseChainQuerySchema = z.object({
   hours: z.coerce.number().int().min(1).max(8760).default(24),
   page: z.coerce.number().int().min(1).max(10000).default(1),

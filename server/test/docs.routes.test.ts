@@ -34,6 +34,7 @@ describe('docs routes', () => {
       ['/api/v1/masternodes/health', 'MasternodeHealthApiResponse'],
       ['/api/v1/masternodes/ban-waves', 'BanWaveAnalysisApiResponse'],
       ['/api/v1/masternodes/ban-attribution', 'BanAttributionApiResponse'],
+      ['/api/v1/network-noise/pose-events', 'PoseObservedEventsApiResponse'],
     ] as const;
 
     for (const [path, schemaName] of contractPaths) {

@@ -54,6 +54,9 @@ class PoseTelemetryService {
     if (query.kind !== undefined) match.kind = query.kind;
     if (query.quorumType !== undefined) match.quorumType = query.quorumType;
     if (query.proTxHash !== undefined) match.proTxHash = query.proTxHash;
+    if (query.eventBlockHeight !== undefined) match.eventBlockHeight = query.eventBlockHeight;
+    if (query.eventBlockHash !== undefined) match.eventBlockHash = query.eventBlockHash;
+    if (query.quorumHash !== undefined) match.quorumHash = query.quorumHash;
     const pipeline: PipelineStage[] = [
       { $match: match },
       { $sort: { eventAt: 1, observationKey: 1 } },

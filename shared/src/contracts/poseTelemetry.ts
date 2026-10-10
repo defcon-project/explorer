@@ -93,6 +93,9 @@ export const poseEventsQuerySchema = z.object({
   kind: poseEventKindSchema.optional(),
   quorumType: z.coerce.number().int().min(0).max(255).optional(),
   proTxHash: hash.optional(),
+  eventBlockHeight: z.coerce.number().int().safe().nonnegative().optional(),
+  eventBlockHash: hash.optional(),
+  quorumHash: hash.optional(),
 });
 
 const scoreVariant = z.object({

@@ -3,6 +3,7 @@ import {
   activeMasternodeVersionsApiResponseSchema,
   banWaveAnalysisApiResponseSchema,
   banAttributionApiResponseSchema,
+  poseObservedEventsApiResponseSchema,
   masternodeApiResponseSchema,
   masternodeDistributionApiResponseSchema,
   masternodeEventsApiResponseSchema,
@@ -37,7 +38,8 @@ export type OpenApiContractName =
   | 'MasternodeEventsApiResponse'
   | 'MasternodeHealthApiResponse'
   | 'BanWaveAnalysisApiResponse'
-  | 'BanAttributionApiResponse';
+  | 'BanAttributionApiResponse'
+  | 'PoseObservedEventsApiResponse';
 
 function toOpenApiSchema(schema: unknown): OpenApiSchema {
   return convertToOpenApiSchema(schema, {
@@ -63,6 +65,7 @@ export const openApiContractSchemas: Record<OpenApiContractName, OpenApiSchema> 
   MasternodeHealthApiResponse: toOpenApiSchema(masternodeHealthApiResponseSchema),
   BanWaveAnalysisApiResponse: toOpenApiSchema(banWaveAnalysisApiResponseSchema),
   BanAttributionApiResponse: toOpenApiSchema(banAttributionApiResponseSchema),
+  PoseObservedEventsApiResponse: toOpenApiSchema(poseObservedEventsApiResponseSchema),
 };
 
 export function openApiContractRef(name: OpenApiContractName) {

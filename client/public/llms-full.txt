@@ -130,7 +130,6 @@ Amount fields outside /api/ai/*: fields ending in "Sat" (balanceSat, rewardSat, 
 - /tx/:txid
 - /address/:address
 - /richlist
-- /wallets
 - /mining
 - /network
 - /chain-health

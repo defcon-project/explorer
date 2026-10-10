@@ -42,12 +42,6 @@ const exactRoutes: Record<string, RouteSeo> = {
     keywords: 'DeFCoN rich list, DFCN top holders, wallet distribution',
     robots: DEFAULT_ROBOTS,
   },
-  '/wallets': {
-    title: 'Top Wallets | DefTrack DeFCoN Explorer',
-    description: 'Top DeFCoN wallets and balance distribution analytics with interactive range filtering.',
-    keywords: 'DeFCoN top wallets, DFCN wallet analytics, balance distribution',
-    robots: DEFAULT_ROBOTS,
-  },
   '/mining': {
     title: 'Rewards Analytics | DefTrack DeFCoN Explorer',
     description: 'Track DeFCoN masternode and staking reward metrics, economics, and network activity.',
@@ -195,6 +189,7 @@ const prefixRoutes: Array<{ prefix: string; seo: RouteSeo }> = [
 ];
 
 const canonicalAliases: Record<string, string> = {
+  '/wallets': '/richlist',
   '/crawler': '/chain-health',
   '/devtools/provider-tags': '/provider-tags',
 };

@@ -21,11 +21,6 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://deftrack.xyz/wallets</loc>
-    <changefreq>hourly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://deftrack.xyz/mining</loc>
     <changefreq>hourly</changefreq>
     <priority>0.8</priority>

@@ -7,7 +7,6 @@ const ROUTE_PRELOADERS: Record<string, () => Promise<unknown>> = {
   '/': () => import('./pages/DashboardPage'),
   '/blocks': () => import('./pages/BlocksPage'),
   '/txs': () => import('./pages/TransactionsPage'),
-  '/wallets': () => import('./pages/TopWalletsPage'),
   '/richlist': () => import('./pages/RichListPage'),
   '/mining': () => import('./pages/MiningPage'),
   '/network': () => import('./pages/NetworkPage'),

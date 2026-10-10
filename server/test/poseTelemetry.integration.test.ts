@@ -54,6 +54,23 @@ describe.skipIf(!uri)('PoSe telemetry with disposable MongoDB', () => {
     expect(poseObservedEventsApiResponseSchema.safeParse({ success: true, data }).success).toBe(true);
   });
 
+  it('filters observations by the complete ban anchor without promoting log evidence', async () => {
+    const first = payload();
+    const event = first.poseEvents[0];
+    await poseTelemetryService.ingest(first);
+    const mismatches = [ { eventBlockHash: 'e'.repeat(64) }, { eventBlockHeight: event.eventBlockHeight! + 1 },
+      { quorumHash: 'f'.repeat(64) }, { quorumType: 7 }, { proTxHash: '1'.repeat(64) } ];
+    for (const [index, mismatch] of mismatches.entries()) await poseTelemetryService.ingest(payload({
+      nodeId: `mismatch-${index}`, poseEvents: [{ ...event, ...mismatch }],
+    }));
+    const data = await poseTelemetryService.getEvents(query({ proTxHash: event.proTxHash!, quorumType: event.quorumType!,
+      eventBlockHeight: event.eventBlockHeight!, eventBlockHash: event.eventBlockHash!.toUpperCase(), quorumHash: event.quorumHash!.toUpperCase() }));
+    expect(data).toMatchObject({ total: 1, observationCount: 1, chainVerifiedEvents: 0 });
+    expect(data.events[0]).toMatchObject({ eventBlockHash: event.eventBlockHash, eventBlockHeight: event.eventBlockHeight,
+      quorumHash: event.quorumHash, observerCount: 1, canonicalStatus: 'unverified', evidence: 'log_observed' });
+    expect(data.events[0].observerNodeIds).toEqual([first.nodeId]);
+  });
+
   it('handles concurrent unique-key races without duplicate records', async () => {
     const source = payload();
     await Promise.all(Array.from({ length: 12 }, () => poseTelemetryService.ingest(source)));

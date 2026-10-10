@@ -465,6 +465,25 @@ export const openApiDocument: OpenApiDocument = {
         },
       },
     },
+    '/api/v1/network-noise/pose-events': {
+      get: {
+        tags: ['V1'], summary: 'Paginated unverified PoSe log observations',
+        description: 'No-store. Optional exact anchors restrict candidates; matching chain identifiers never verify a log claim.',
+        parameters: [
+          { name: 'hours', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 8760, default: 24 } },
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 10000, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+          { name: 'kind', in: 'query', schema: { type: 'string', enum: ['penalty_change', 'ban', 'recovery', 'dkg_member', 'quorum_build_failure'] } },
+          { name: 'quorumType', in: 'query', schema: { type: 'integer', minimum: 0, maximum: 255 } },
+          { name: 'proTxHash', in: 'query', schema: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' } },
+          { name: 'eventBlockHeight', in: 'query', schema: { type: 'integer', minimum: 0 } },
+          { name: 'eventBlockHash', in: 'query', schema: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' } },
+          { name: 'quorumHash', in: 'query', schema: { type: 'string', pattern: '^[a-fA-F0-9]{64}$' } },
+        ],
+        responses: { 200: openApiSuccessResponse('PoseObservedEventsApiResponse'),
+          400: OpenApiResponses.badRequest, 500: OpenApiResponses.internalError },
+      },
+    },
     '/api/v1/masternodes/ban-attribution': {
       get: {
         tags: ['V1', 'Masternodes'],

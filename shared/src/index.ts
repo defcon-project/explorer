@@ -1,5 +1,7 @@
 export * from './types';
 export * from './constants';
+export { banAttributionApiResponseSchema } from './contracts/banAttribution';
+export { poseObservedEventsApiResponseSchema } from './contracts/poseTelemetry';
 export type {
   ActiveMasternodeVersionsContract,
   SearchApiResponse,

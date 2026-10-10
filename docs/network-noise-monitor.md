@@ -237,7 +237,10 @@ backfill chain history. It preserves alternate hashes for subsequent validation.
 `GET /api/v1/network-noise/pose-events` returns a no-store, shared-schema-validated
 response. It works even when ingest is disabled. Parameters are validated rather
 than clamped: `hours` 1–8760 (default 24), `page` 1–10000 (default 1), `limit` 1–100
-(default 50), and optional `kind`, `quorumType` and `proTxHash`. The window uses
+(default 50), and optional `kind`, `quorumType`, `proTxHash`, `eventBlockHeight`,
+`eventBlockHash` and `quorumHash`. Block/quorum hashes normalize to lowercase;
+all supplied anchors must match exactly. Anchor matches remain unverified log
+claims, including when opened from a verified BANNED_BY panel. The window uses
 the source `eventAt`, excludes future events, and excludes expired records even
 before MongoDB's TTL cleanup. Pages sort by latest event time, then event key;
 they can move as new reports arrive.

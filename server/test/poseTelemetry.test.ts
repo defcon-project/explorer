@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { networkNoiseIngestSchema, poseTelemetryEventSchema } from '@defcon/shared/dist/contracts';
+import { networkNoiseIngestSchema, poseTelemetryEventSchema, poseEventsQuerySchema } from '@defcon/shared/dist/contracts';
 import { isDuplicateKeyOnly, poseObservationIdentity } from '../src/domain/pose/poseTelemetry';
 import { poseEvent, posePayload } from './fixtures/poseTelemetry';
 
 describe('structured PoSe identity and ingest contract', () => {
+  it('normalizes exact observation anchors and rejects malformed filters', () => {
+    expect(poseEventsQuerySchema.parse({ eventBlockHeight: '100', eventBlockHash: 'A'.repeat(64), quorumHash: 'B'.repeat(64) }))
+      .toMatchObject({ eventBlockHeight: 100, eventBlockHash: 'a'.repeat(64), quorumHash: 'b'.repeat(64) });
+    for (const query of [{ eventBlockHeight: -1 }, { eventBlockHeight: 1.5 }, { eventBlockHeight: Number.MAX_SAFE_INTEGER + 1 },
+      { eventBlockHash: 'bad' }, { quorumHash: ['a'.repeat(64), 'b'.repeat(64)] }]) {
+      expect(poseEventsQuerySchema.safeParse(query).success).toBe(false);
+    }
+  });
   it('retains every structured field and normalizes hash casing', () => {
     const parsed = networkNoiseIngestSchema.parse(posePayload({
       poseEvents: [poseEvent({ eventBlockHash: 'A'.repeat(64) })],

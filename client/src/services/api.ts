@@ -1,5 +1,7 @@
 import axios from 'axios';
 import type { OperatorDiagnosisData } from '@defcon/shared/dist/contracts';
+import { banAttributionApiResponseSchema, poseObservedEventsApiResponseSchema } from '@defcon/shared';
+import type { BanAttributionQuery, BanAttributionProof } from '@defcon/shared/dist/contracts';
 import type {
   ActiveMasternodeVersionsView,
   AddressBalanceView,
@@ -46,6 +48,27 @@ import type { OpenApiDocument } from '../types/openapi';
 import type { PoseChainData } from '@defcon/shared/dist/contracts';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
+
+export async function fetchBanAttribution(params: BanAttributionQuery) {
+  const { data } = await api.get('/v1/masternodes/ban-attribution', { params });
+  const result = banAttributionApiResponseSchema.parse(data).data;
+  if (result.proTxHash !== params.proTxHash || result.banHeight !== params.banHeight) throw new Error('Ban identity mismatch');
+  return result;
+}
+
+export async function fetchBanObservations(proof: BanAttributionProof, page: number) {
+  const { data } = await api.get('/v1/network-noise/pose-events', { params: {
+    proTxHash: proof.proTxHash, eventBlockHeight: proof.blockHeight, eventBlockHash: proof.blockHash,
+    quorumType: proof.quorumType, quorumHash: proof.quorumHash, hours: 8760, limit: 20, page,
+  } });
+  const result = poseObservedEventsApiResponseSchema.parse(data).data;
+  if (result.page !== page || result.limit !== 20) throw new Error('Observation page mismatch');
+  if (result.events.some(e => e.proTxHash !== proof.proTxHash || e.eventBlockHeight !== proof.blockHeight
+    || e.eventBlockHash !== proof.blockHash || e.quorumType !== proof.quorumType || e.quorumHash !== proof.quorumHash)) {
+    throw new Error('Observation anchor mismatch');
+  }
+  return result;
+}
 
 export async function fetchPoseChainSummary(params: { hours: number; since?: string; fromHeight?: number }): Promise<PoseChainData> {
   const { data } = await api.get<ApiEnvelope<PoseChainData>>('/v1/masternodes/pose-chain', { params: { ...params, limit: 1 } });

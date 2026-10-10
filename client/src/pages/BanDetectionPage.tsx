@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { OperatorDiagnosisPanel, nodePermalink } from '../components/OperatorDiagnosisPanel';
+import { BannedByPanel } from '../components/BannedByPanel';
 import {
   HiOutlineFire,
   HiOutlineBolt,
@@ -118,6 +119,7 @@ export function BanDetectionPage() {
   const [focusChart, setFocusChart] = useState(false);
   const nodeFilter = searchParams.get('node') ?? '';
   const setNodeFilter = (value: string) => { const next = new URLSearchParams(searchParams);
+    next.delete('ban');
     if (value) next.set('node', value); else next.delete('node');
     setSearchParams(next, { replace: true }); };
   const [repeatsOnly, setRepeatsOnly] = useState(false);
@@ -549,7 +551,7 @@ export function BanDetectionPage() {
         <p className="mnh-panel-sub">Distinct ban blocks per masternode identity, including isolated bans. Current state is independent of historical recovery.</p>
         <div className="mnh-table-wrap">
           <table className="mnh-table">
-            <thead><tr><th>Node / Service</th><th>Ban events</th><th>Last ban block</th><th>Last event</th><th>Recorded recovery</th><th>Current state</th><th>Penalty</th></tr></thead>
+            <thead><tr><th>Node / Service</th><th>Ban events</th><th>Last ban block</th><th>Last event</th><th>Recorded recovery</th><th>Current state</th><th>Penalty</th><th>Ban cause</th></tr></thead>
             <tbody>{visibleNodes.map((node) => <tr key={node.proTxHash || node.nodeId}>
               <td className="mnh-mono"><Link to={nodePermalink(node.proTxHash || node.service || node.nodeId)}>{node.service || 'Unknown service'}</Link><div title={node.proTxHash || node.nodeId} className="mnh-meta-line">{truncateHash(node.proTxHash || node.nodeId, 8)}</div></td>
               <td>{node.banCount}</td>
@@ -558,6 +560,10 @@ export function BanDetectionPage() {
               <td>{node.recoveredAt ? new Date(node.recoveredAt).toLocaleString() : 'Not recorded'}</td>
               <td>{data?.rpcAvailable && data.dataStatus !== 'stale' ? node.currentStatus ?? 'Unknown / not registered' : 'Unknown'}</td>
               <td>{data?.rpcAvailable && data.dataStatus !== 'stale' ? node.currentPenalty ?? 'Unknown' : 'Unknown'}</td>
+              <td><button type="button" className="bd-ban-evidence"
+                disabled={!/^[a-fA-F0-9]{64}$/.test(node.proTxHash ?? '') || !node.lastBanHeight || node.lastBanHeight < 1}
+                onClick={() => { const next = new URLSearchParams(searchParams); next.set('node', node.proTxHash!.toLowerCase());
+                  next.set('ban', String(node.lastBanHeight)); setSearchParams(next); }}>Ban evidence</button></td>
             </tr>)}</tbody>
           </table>
         </div>
@@ -565,6 +571,7 @@ export function BanDetectionPage() {
       </section>
 
       <OperatorDiagnosisPanel filter={nodeFilter} paused={paused || !isPageVisible} />
+      <BannedByPanel identity={nodeFilter} height={searchParams.get('ban') ?? ''} paused={paused || !isPageVisible} />
 
       {/* Wave list */}
       <section className="mnh-panel">

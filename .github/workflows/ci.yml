@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 20
     services:
       mongo:
-        image: mongo:8
+        image: mongo:7.0
         ports:
           - 127.0.0.1:27017:27017
         options: >-

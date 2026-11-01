@@ -165,7 +165,7 @@ A rollback follows the deployment steps from `npm ci` onward, including the sepa
 
 While a rollback runs, an untracked `ROLLBACK-IN-PROGRESS` file keeps the worktree dirty. The checkout already holds the target's scripts by then, and those may not know the lock, but their preflight refuses a dirty worktree, so `ops:deploy` cannot start beside the rollback. The file goes when the rollback ends. If Git is set to hide untracked files (`status.showUntrackedFiles=no`), this cannot work, so the rollback stops before changing anything; remove that setting and run it again.
 
-A rollback does not touch MongoDB. Restore a backup only if data was damaged (see [MongoDB Restore](#mongodb-restore)).
+A rollback does not touch MongoDB. Restore a backup only if data was damaged (see [MongoDB Restore](#mongodb-restore)). A rollback to a release from before network noise receipt retention needs one extra database step with the service stopped; see [Network Noise Monitor](network-noise-monitor.md).
 
 ## MongoDB Backup
 
@@ -186,6 +186,8 @@ Backups are written to `$APP_DIR/backups/mongodb/defcon_explorer_<UTC timestamp>
 A dump counts as restorable only when it contains gzipped BSON data and a `.complete` marker. It also contains a `backup.meta` file with the creation time, Git commit and collection count. Incomplete dumps are removed automatically. After a successful dump, the script deletes completed backups in the backup root that are older than the retention period, which defaults to 14 days. `--no-prune` skips this retention pass.
 
 MongoDB credentials reach `mongodump` and `mongorestore` only through a temporary config file with mode `0600`. They are never printed or placed in command arguments.
+
+The script reads the network noise baselines again after everything else, because a batch receipt is deleted only once the baseline records its sequence. A dump made by hand with `mongodump` does not have this order; see [Network Noise Monitor](network-noise-monitor.md).
 
 ## MongoDB Restore
 

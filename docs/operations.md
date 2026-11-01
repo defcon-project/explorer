@@ -14,7 +14,7 @@ The operations scripts target a single Linux host:
 - MongoDB and the DeFCoN Core daemon (`defcond`) run on the same host. MongoDB and the daemon's RPC interface listen on `127.0.0.1` only; the daemon's P2P port (`8192`) may accept inbound connections (see [Production Hardening](#production-hardening)). The app reads the chain over the daemon's JSON-RPC interface.
 - Readiness endpoint: `http://127.0.0.1:3001/api/health/ready`. It returns `{"status":"ok"}` only when both MongoDB and the daemon RPC are reachable, and `degraded` or `down` otherwise.
 
-The scripts require bash, systemd, GNU coreutils and findutils, `git`, `node`/`npm`, `curl`, and the MongoDB Database Tools (`mongodump`, `mongorestore`).
+The scripts require bash, systemd, GNU coreutils and findutils, `git`, `node`/`npm`, `curl`, and the MongoDB Database Tools (`mongodump`, `mongorestore`). `npm run ops:restore-check` also needs `bsondump`, from the same tools, and `mongod`.
 
 ### Reference configuration files
 
@@ -183,11 +183,11 @@ npm run ops:backup
 
 Backups are written to `$APP_DIR/backups/mongodb/defcon_explorer_<UTC timestamp>`, for example `defcon_explorer_20260923T101500Z`. The `backups/` directory is git-ignored, so backups inside the checkout do not make the worktree dirty.
 
-A dump counts as restorable only when it contains gzipped BSON data and a `.complete` marker. It also contains a `backup.meta` file with the creation time, Git commit and collection count. Incomplete dumps are removed automatically. After a successful dump, the script deletes completed backups in the backup root that are older than the retention period, which defaults to 14 days. `--no-prune` skips this retention pass.
+A dump counts as restorable only when it contains gzipped BSON data and a `.complete` marker. It also contains a `backup.meta` file with the creation time, Git commit and collection count, and a `backup.sha256` file with a checksum of every file. Incomplete dumps are removed automatically. After a successful dump, the script deletes completed backups in the backup root that are older than the retention period, which defaults to 14 days. `--no-prune` skips this retention pass.
 
 MongoDB credentials reach `mongodump` and `mongorestore` only through a temporary config file with mode `0600`. They are never printed or placed in command arguments.
 
-The script reads the network noise baselines again after everything else, because a batch receipt is deleted only once the baseline records its sequence. A dump made by hand with `mongodump` does not have this order; see [Network Noise Monitor](network-noise-monitor.md).
+A backup never writes into an existing backup: a second one in the same second stops with an error. The script reads the network noise baselines again after everything else, because a batch receipt is deleted only once the baseline records its sequence. A dump made by hand with `mongodump` does not have this order; see [Network Noise Monitor](network-noise-monitor.md).
 
 ## MongoDB Restore
 
@@ -203,16 +203,31 @@ A real restore requires explicit confirmation:
 npm run ops:restore -- --backup defcon_explorer_TIMESTAMP --yes
 ```
 
-The restore accepts only completed backups inside the configured backup root. It runs these steps:
+The restore accepts only completed backups inside the configured backup root whose files still match their checksums, so a lost or changed file stops it before anything changes, also on a dry run. A backup from before checksums needs `--allow-unverified`. It runs these steps:
 
 1. Creates a fresh safety backup.
 2. Stops the service.
-3. Restores MongoDB with `mongorestore --drop`.
+3. Restores MongoDB with `mongorestore --drop`, and fails unless `mongorestore` reports that every collection finished, documents were restored and none failed. It replaces the collections in the backup; a collection that exists only in the live database stays.
 4. Starts the service and verifies readiness.
 
-If the restore fails after the service was stopped, an exit trap tries to start the service again.
+If the restore fails after the service was stopped, an exit trap tries to start the service again. The database may then be partly restored; the error names the safety backup.
 
 The safety backup runs with `--no-prune`, so a restore never deletes existing backups.
+
+If `MONGODB_URI` names a database, the backup must hold a folder for it; the script checks this before it changes anything, also on a dry run.
+
+## MongoDB Restore Check
+
+Prove that a backup can be restored, without touching the live database or the service:
+
+```bash
+npm run ops:restore-check
+npm run ops:restore-check -- --backup defcon_explorer_TIMESTAMP
+```
+
+The check takes the newest complete backup unless you name one, and refuses it if its files no longer match their checksums; `--allow-unverified` accepts a backup from before checksums. It starts its own MongoDB, which listens only on a socket in a private temporary folder, so no other local account can reach it. It restores the backup there, and compares the documents restored in each collection with the documents in the backup. It stops with an error on any difference, and removes the temporary database when it ends. It does not read `MONGODB_URI`. The temporary database uses a hidden folder beside the backups and needs about the uncompressed size of the data on that disk.
+
+Run it before a real restore, and after any upgrade of the MongoDB Database Tools: the restore relies on what `mongorestore` reports, and the check shows on the safe side whether it still reports it.
 
 ## Production Hardening
 

@@ -24,7 +24,8 @@ done
 [[ -z "$collection" || "\${STUB_FAIL:-}" != collection ]] || exit 1
 mkdir -p "$out/$db"
 for name in \${collection:-$STUB_COLLECTIONS}; do
-  echo dumped > "$out/$db/$name.bson.gz"
+  echo "dumped\${collection:+ again}" > "$out/$db/$name.bson.gz"
+  echo metadata > "$out/$db/$name.metadata.json.gz"
 done
 `;
 
@@ -84,6 +85,20 @@ describe.skipIf(!canRun)('MongoDB backup script', { timeout: 60_000 }, () => {
     expect(readFileSync(path.join(folder, 'backup.meta'), 'utf8')).toContain('collections=3');
   });
 
+  it('records a checksum of every file as the backup ended, without the marks that finish it', () => {
+    const result = backup();
+    expect(result.status, result.stderr).toBe(0);
+
+    const folder = path.join(backups, made()[0]);
+    const listed = readFileSync(path.join(folder, 'backup.sha256'), 'utf8').trim().split('\n').map((line) => line.split(/\s+\*?/)[1]).sort();
+    expect(listed).toEqual(['./backup.meta', './testdb/blocks.bson.gz', './testdb/blocks.metadata.json.gz',
+      './testdb/networknoisebaselines.bson.gz', './testdb/networknoisebaselines.metadata.json.gz',
+      './testdb/networknoisebatches.bson.gz', './testdb/networknoisebatches.metadata.json.gz']);
+    // The baselines read again last are what the checksums cover.
+    const check = spawnSync(bash, ['-c', 'cd "$1" && sha256sum --check --quiet --strict backup.sha256', '_', posix(folder)], { env, encoding: 'utf8' });
+    expect(check.status, check.stdout).toBe(0);
+  });
+
   it('names the database the dump found, whatever the URI says', () => {
     env.MONGODB_URI = 'mongodb://127.0.0.1:27017/';
     const result = backup();
@@ -97,6 +112,32 @@ describe.skipIf(!canRun)('MongoDB backup script', { timeout: 60_000 }, () => {
     expect(result.status, result.stderr).toBe(0);
     expect(dumps()).toHaveLength(1);
     expect(existsSync(path.join(backups, made()[0], '.complete'))).toBe(true);
+  });
+
+  it('does not write into a backup made in the same second', () => {
+    // The timestamp is the only part of a backup's name that varies.
+    const stubDir = path.join(root, 'stubs');
+    writeFileSync(path.join(stubDir, 'date'), `#!/usr/bin/env bash
+case "$*" in
+  *%Y%m%dT*) echo 20260101T000000Z ;;
+  *) PATH="\${PATH#*:}" exec date "$@" ;;
+esac
+`);
+    execFileSync(bash, ['-c', 'chmod +x "$1"', '_', posix(path.join(stubDir, 'date'))]);
+    const existing = path.join(backups, 'defcon_explorer_20260101T000000Z');
+    for (const complete of [true, false]) {
+      mkdirSync(existing, { recursive: true });
+      writeFileSync(path.join(existing, 'blocks.bson.gz'), 'the first backup');
+      if (complete) writeFileSync(path.join(existing, '.complete'), '');
+      else rmSync(path.join(existing, '.complete'));
+
+      const result = backup();
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('Backup already exists');
+      expect(readFileSync(logFile, 'utf8')).toBe('');
+      expect(readFileSync(path.join(existing, 'blocks.bson.gz'), 'utf8')).toBe('the first backup');
+    }
   });
 
   it('leaves no backup behind when reading the baselines fails', () => {

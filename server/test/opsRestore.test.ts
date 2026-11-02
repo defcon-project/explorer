@@ -14,6 +14,7 @@ const canRun = process.platform === 'linux' || Boolean(process.env.OPS_TEST_BASH
 // mongorestore behaves as the real tool was measured to: a URI that names a database makes it read
 // the path as that database's folder, so given a whole backup it skips everything and exits 0.
 // It reports system collections to nobody. A collection file holds its document count.
+// It prints each name in backticks as 100.18 does, or bare as 100.15 does (STUB_BARE_NAMES).
 const MONGORESTORE_STUB = `#!/usr/bin/env bash
 echo "mongorestore $*" >> "$STUB_LOG"
 target="\${!#}"
@@ -40,7 +41,9 @@ while IFS= read -r file; do
   count="$(gzip -dc "$file")"
   [[ "\${STUB_FAIL:-}" != short || "$name" != */blocks ]] || count=$((count - 1))
   [[ "\${STUB_FAIL:-}" != unfinished || "$name" != */blocks ]] || continue
-  echo "finished restoring \\\`\${name/\\//.}\\\` ($count documents, 0 failures)" >&2
+  label="\${name/\\//.}"
+  [[ -n "\${STUB_BARE_NAMES:-}" ]] || label="\\\`$label\\\`"
+  echo "finished restoring $label ($count documents, 0 failures)" >&2
   total=$((total + count))
 done < <(find "$target" -type f -name '*.bson.gz' ! -name 'system.*' | sort)
 failed=0
@@ -108,7 +111,7 @@ describe.skipIf(!canRun)('MongoDB restore scripts', { timeout: 60_000 }, () => {
     }
 
     env = { ...process.env };
-    for (const key of ['APP_DIR', 'ENV_FILE', 'BACKUP_DIR', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'STUB_FAIL']) {
+    for (const key of ['APP_DIR', 'ENV_FILE', 'BACKUP_DIR', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'STUB_FAIL', 'STUB_BARE_NAMES']) {
       delete env[key];
     }
     env.PATH = `${stubDir}${path.delimiter}${process.env.PATH}`;
@@ -283,6 +286,28 @@ describe.skipIf(!canRun)('MongoDB restore scripts', { timeout: 60_000 }, () => {
       expect(log).not.toContain('systemctl');
       expect(workFolders()).toEqual([]);
       expect(mongodStillRuns()).toBe(false);
+    });
+
+    it('reads the report of tools that print collection names bare', () => {
+      makeBackup('defcon_explorer_20260101T000000Z');
+      env.STUB_BARE_NAMES = '1';
+      const result = run('restore-check.sh');
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('testdb.blocks: 3 documents');
+      expect(result.stdout).toContain('testdb.txs: 2 documents');
+      expect(result.stdout).toContain('restored 5 documents');
+    });
+
+    it('still finds a short collection in such a report', () => {
+      makeBackup('defcon_explorer_20260101T000000Z');
+      env.STUB_BARE_NAMES = '1';
+      env.STUB_FAIL = 'short';
+      const result = run('restore-check.sh');
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('testdb.blocks: 3 in the backup, 2 restored');
+      expect(result.stdout).not.toContain('Restore check passed');
     });
 
     it('does not read the live database settings', () => {

@@ -123,7 +123,8 @@ while IFS= read -r file; do
   namespace="${namespace/\//.}"
   in_backup="$({ gzip -dc -- "$file" | bsondump --outFile=/dev/null; } 2>&1 | sed -n -E 's/.*[^0-9]([0-9]+) objects? found.*/\1/p' | tail -n 1)" \
     || die "Could not read $relative"
-  restored="$( (grep -F "finished restoring \`$namespace\` (" "$restore_log" || true) | sed -n -E 's/.*\(([0-9]+) documents?,.*/\1/p' | tail -n 1)"
+  # mongorestore 100.15 prints the name bare, 100.18 in backticks.
+  restored="$( (grep -F -e "finished restoring $namespace (" -e "finished restoring \`$namespace\` (" "$restore_log" || true) | sed -n -E 's/.*\(([0-9]+) documents?,.*/\1/p' | tail -n 1)"
   if [[ -z "$in_backup" || "$in_backup" != "$restored" ]]; then
     warn "$namespace: ${in_backup:-unknown} in the backup, ${restored:-none} restored"
     mismatches=$((mismatches + 1))

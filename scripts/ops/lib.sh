@@ -115,6 +115,15 @@ mongo_uri_database() {
   return 0
 }
 
+# One at a time per backup root: a retention pass must not remove what a restore or a restore check is
+# reading, a check must see the newest backup, and a backup must not read a database being restored.
+# The kernel drops this lock when the process ends, however it ends.
+lock_backup_root() {
+  require_command flock
+  exec 8<"$BACKUP_DIR"
+  flock -w "${BACKUP_LOCK_WAIT_SECONDS:-3600}" 8 || die "Another backup, restore or restore check is still running in $BACKUP_DIR"
+}
+
 # Lists a backup's files with their checksums, all but the two that mark it finished.
 list_backup_files() {
   find . -type f ! -name "$BACKUP_CHECKSUMS" ! -name .complete -print0 | LC_ALL=C sort -z

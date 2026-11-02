@@ -46,6 +46,9 @@ for tool in mongod mongorestore bsondump gzip nice mktemp realpath sha256sum; do
 done
 
 BACKUP_DIR="$(canonical_path "$BACKUP_DIR")"
+[[ -d "$BACKUP_DIR" ]] || die "No complete backup found in $BACKUP_DIR"
+# Before choosing: a backup being written comes to be the choice, and no retention pass removes the choice.
+[[ "$DRY_RUN" -eq 1 ]] || lock_backup_root
 
 if [[ -z "$SELECTED_BACKUP" ]]; then
   # The timestamp in the name sorts by age.
@@ -89,7 +92,7 @@ restore_log="$WORK_DIR/restore.log"
 socket="$WORK_DIR/mongod.sock"
 log "Starting a throwaway MongoDB"
 nice -n 10 mongod --dbpath "$WORK_DIR/db" --bind_ip "$socket" --unixSocketPrefix "$WORK_DIR" \
-  --wiredTigerCacheSizeGB 0.25 --logpath "$WORK_DIR/mongod.log" --quiet &
+  --wiredTigerCacheSizeGB 0.25 --logpath "$WORK_DIR/mongod.log" --quiet 8<&- &
 MONGOD_PID=$!
 
 ready=0

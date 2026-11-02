@@ -10,6 +10,8 @@ const opsDir = path.resolve(__dirname, '../../scripts/ops');
 // As in opsDeploy.test.ts: a local run on Windows names Git Bash's usr/bin/bash.exe.
 const bash = process.env.OPS_TEST_BASH ?? 'bash';
 const canRun = process.platform === 'linux' || Boolean(process.env.OPS_TEST_BASH);
+// Git Bash has no flock. There it becomes a stub, and the tests that need the real one are skipped.
+const hasFlock = canRun && spawnSync(bash, ['-c', 'command -v flock']).status === 0;
 
 // mongorestore behaves as the real tool was measured to: a URI that names a database makes it read
 // the path as that database's folder, so given a whole backup it skips everything and exits 0.
@@ -17,6 +19,7 @@ const canRun = process.platform === 'linux' || Boolean(process.env.OPS_TEST_BASH
 // It prints each name in backticks as 100.18 does, or bare as 100.15 does (STUB_BARE_NAMES).
 const MONGORESTORE_STUB = `#!/usr/bin/env bash
 echo "mongorestore $*" >> "$STUB_LOG"
+if [[ -n "\${STUB_CHECK_LOCK:-}" ]] && ! flock -n "$STUB_CHECK_LOCK" true; then echo "lock held during the restore" >> "$STUB_LOG"; fi
 target="\${!#}"
 uri=""
 for arg in "$@"; do
@@ -109,9 +112,13 @@ describe.skipIf(!canRun)('MongoDB restore scripts', { timeout: 60_000 }, () => {
       writeFileSync(path.join(stubDir, name), body);
       execFileSync(bash, ['-c', 'chmod +x "$1"', '_', posix(path.join(stubDir, name))]);
     }
+    if (!hasFlock) {
+      writeFileSync(path.join(stubDir, 'flock'), '#!/usr/bin/env bash\n');
+      execFileSync(bash, ['-c', 'chmod +x "$1"', '_', posix(path.join(stubDir, 'flock'))]);
+    }
 
     env = { ...process.env };
-    for (const key of ['APP_DIR', 'ENV_FILE', 'BACKUP_DIR', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'STUB_FAIL', 'STUB_BARE_NAMES']) {
+    for (const key of ['APP_DIR', 'ENV_FILE', 'BACKUP_DIR', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'STUB_FAIL', 'STUB_BARE_NAMES', 'BACKUP_LOCK_WAIT_SECONDS', 'STUB_CHECK_LOCK']) {
       delete env[key];
     }
     env.PATH = `${stubDir}${path.delimiter}${process.env.PATH}`;
@@ -254,6 +261,58 @@ describe.skipIf(!canRun)('MongoDB restore scripts', { timeout: 60_000 }, () => {
       expect(result.status, result.stderr).toBe(0);
       expect(calls()).toMatch(/defcon_explorer_old\/testdb\n/);
       expect(`${result.stdout}${result.stderr}${calls()}`).not.toContain('s3cret-value');
+    });
+  });
+
+  describe('the lock of the backup root', () => {
+    it.runIf(hasFlock)('is held while a restore check restores', () => {
+      makeBackup('defcon_explorer_20260101T000000Z');
+      env.STUB_CHECK_LOCK = posix(backups);
+      const result = run('restore-check.sh');
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls()).toContain('lock held during the restore');
+    });
+
+    it.runIf(hasFlock)('is held while a restore restores', () => {
+      makeBackup('defcon_explorer_20260101T000000Z');
+      env.STUB_CHECK_LOCK = posix(backups);
+      const result = run('restore.sh', '--backup', 'defcon_explorer_20260101T000000Z', '--yes');
+      expect(result.status, result.stderr).toBe(0);
+      expect(calls()).toContain('lock held during the restore');
+    });
+
+    it.runIf(hasFlock)('makes a restore check give up before it starts anything', () => {
+      makeBackup('defcon_explorer_20260101T000000Z');
+      env.BACKUP_LOCK_WAIT_SECONDS = '0';
+      const result = spawnSync(bash, ['-c', 'flock "$1" bash "$2" --backup-dir "$1"', '_', posix(backups), posix(path.join(opsDir, 'restore-check.sh'))], { env, encoding: 'utf8' });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('is still running');
+      expect(calls()).toBe('');
+    });
+
+    it.runIf(hasFlock)('makes a restore check take the backup that was being written', () => {
+      makeBackup('defcon_explorer_20260101T000000Z');
+      // Hidden, so nothing takes it for a backup until the holder of the lock moves it into place.
+      makeBackup('.being-written');
+      const result = spawnSync(bash, ['-c', `flock "$1" bash -c 'sleep 1; mv "$0/.being-written" "$0/defcon_explorer_20260102T000000Z"' "$1" &
+sleep 0.3
+bash "$2" --backup-dir "$1"; status=$?
+wait
+exit $status`, '_', posix(backups), posix(path.join(opsDir, 'restore-check.sh'))], { env, encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('Checking backup: defcon_explorer_20260102T000000Z');
+    });
+
+    it.runIf(hasFlock)('stops a restore that lost its backup to a retention pass, with the service still up', () => {
+      makeBackup('defcon_explorer_20260101T000000Z');
+      // The safety backup is the last step before the lock: the selected backup goes away right after it.
+      writeFileSync(path.join(root, 'stubs', 'mongodump'), `${STUBS.mongodump}rm -rf -- "$STUB_REMOVE"\n`);
+      env.STUB_REMOVE = posix(path.join(backups, 'defcon_explorer_20260101T000000Z'));
+      const result = run('restore.sh', '--backup', 'defcon_explorer_20260101T000000Z', '--yes');
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('Backup directory not found');
+      expect(calls()).not.toContain('systemctl stop');
+      expect(calls()).not.toContain('mongorestore');
     });
   });
 

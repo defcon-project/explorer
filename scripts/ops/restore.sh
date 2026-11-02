@@ -97,6 +97,9 @@ log "Creating a safety backup before restore"
 safety_backup="$(APP_DIR="$APP_DIR" ENV_FILE="$ENV_FILE" \
   bash "$SCRIPT_DIR/backup.sh" --backup-dir "$BACKUP_DIR" --no-prune | tail -n 1)"
 log "Safety backup: $safety_backup"
+# Only now: the safety backup takes the lock itself. A scheduled backup may have run in between.
+lock_backup_root
+assert_restorable_backup "$SELECTED_BACKUP" "$ALLOW_UNVERIFIED" >/dev/null
 
 RESTORE_LOG="$(mktemp)"
 MONGO_CONFIG="$(create_mongo_tool_config "$mongo_uri")"

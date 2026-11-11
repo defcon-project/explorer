@@ -111,7 +111,6 @@
   color: var(--warning);
 }
 
-.theme-toggle,
 .mobile-toggle {
   display: inline-flex;
   align-items: center;
@@ -126,14 +125,9 @@
   transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 
-.theme-toggle:hover,
 .mobile-toggle:hover {
   border-color: var(--accent);
   color: var(--accent);
-}
-
-.theme-toggle {
-  font-size: 1.1rem;
 }
 
 .mobile-toggle {

@@ -162,18 +162,20 @@ test('mobile drawer exposes the same top-level navigation @smoke', async ({ page
   await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible();
 });
 
-test('theme preference is persisted after a reload @smoke', async ({ page }) => {
+test('the site stays dark for light-mode visitors and offers no theme switch @smoke', async ({ page }) => {
+  // A visitor whose system prefers light mode and who saved the retired light theme earlier.
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.addInitScript(() => {
+    window.localStorage.setItem('defcon-theme', 'light');
+  });
+
   await page.goto('/about');
-  await page.evaluate(() => window.localStorage.removeItem('defcon-theme'));
-  await page.reload();
+  await expect(page.getByRole('heading', { name: 'About DeFCoN' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Toggle theme' })).toHaveCount(0);
 
-  const before = await page.locator('html').getAttribute('data-theme');
-  await page.getByRole('button', { name: 'Toggle theme' }).click();
-  const after = before === 'dark' ? 'light' : 'dark';
-
-  await expect(page.locator('html')).toHaveAttribute('data-theme', after);
-  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('defcon-theme'))).toBe(after);
-
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', after);
+  const rendered = await page.evaluate(() => ({
+    background: getComputedStyle(document.body).backgroundColor,
+    colorScheme: getComputedStyle(document.documentElement).colorScheme,
+  }));
+  expect(rendered).toEqual({ background: 'rgb(7, 17, 31)', colorScheme: 'dark' });
 });

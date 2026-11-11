@@ -45,7 +45,7 @@ const NAV_ITEMS: HeaderNavItem[] = [
     path: '/txs',
     label: 'Explorer',
     icon: HiOutlineCube,
-    aliases: ['/blocks', '/block', '/tx', '/search', '/searchv2', '/address', '/richlist', '/mempool', '/bubblemaps'],
+    aliases: ['/blocks', '/block', '/tx', '/search', '/address', '/richlist', '/mempool', '/bubblemaps'],
     children: [
       { path: '/txs', label: 'Transactions' },
       { path: '/richlist', label: 'Rich List' },

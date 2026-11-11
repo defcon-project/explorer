@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { stubApi } from './apiStub';
+import { openHeaderSearch } from './headerSearch';
 
 // Every block, transaction and address has one address: /block/<height or hash>, /tx/<txid>,
 // /address/<address>. /search resolves a query and moves on; old /searchv2 links lead there too.
@@ -76,15 +77,16 @@ test('the search page opens a matching block on its own page @smoke', async ({ p
   await expect(page.getByRole('heading', { name: 'Block #123,456' })).toBeVisible();
 });
 
-test('the dashboard search opens the transaction page, its links are direct, and Back returns home @smoke', async ({ page }) => {
+test('the header search opens the transaction page, its links are direct, and Back returns home @smoke', async ({ page }) => {
   await stubApi(page, {
     '/api/search': searchFound({ type: 'transaction', matchedBy: 'txid', result: { txid: TXID } }),
     ...txFound,
   });
 
   await page.goto('/');
-  await page.getByLabel('Search the explorer').fill(TXID);
-  await page.getByLabel('Search the explorer').press('Enter');
+  const search = await openHeaderSearch(page);
+  await search.fill(TXID);
+  await search.press('Enter');
 
   await expect(page).toHaveURL(new RegExp(`/tx/${TXID}$`));
   await expect(page.getByRole('heading', { name: 'Transaction', exact: true })).toBeVisible();
@@ -115,7 +117,7 @@ test('the dashboard search opens the transaction page, its links are direct, and
 
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByLabel('Search the explorer')).toBeVisible();
+  await expect(page.locator('.dashboard-hero')).toBeVisible();
 });
 
 test('an old /searchv2 link lands on the transaction page without a step to go back through @smoke', async ({ page }) => {
@@ -125,7 +127,7 @@ test('an old /searchv2 link lands on the transaction page without a step to go b
   });
 
   await page.goto('/');
-  await expect(page.getByLabel('Search the explorer')).toBeVisible();
+  await expect(page.locator('.dashboard-hero')).toBeVisible();
   // Follow an old link inside the app: /searchv2 → /search → /tx, each step replacing the last.
   await page.evaluate((txid) => {
     window.history.pushState({ usr: null, key: 'legacy', idx: 1 }, '', `/searchv2?q=${txid}`);

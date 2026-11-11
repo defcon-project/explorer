@@ -69,19 +69,17 @@ const delayedStats = () => ({
   },
 });
 
-// The longest status labels leave the least room for the title next to them. Every case must
-// fit on screen without sideways scrolling. Below 360px the block height moves to the menu while
-// the status is not "Live", so the title stays on one line and the menu button keeps its size.
-// At 360px beside "Disconnected" the title wraps and the menu button narrows, as it did with the
-// previous system font. Beside "Delayed" the title has only about 2px to spare on Windows, and
-// Linux Chromium rounds glyph widths differently and draws the block height about 3px wider, so
-// there the title wraps too. At 360px the title may therefore take two lines, but never more, and
-// it never runs into the status. The narrow-phone header is redesigned in a later change.
+// The longest status labels leave the least room next to them. Every case must fit on one row
+// without sideways scrolling, with 40px search and menu buttons. Up to 520px the header shows the
+// logo without the title (which stays the link's name); below 360px the block height moves to the
+// menu while the status is not "Live".
 const NARROW_HEADER_CASES = [
-  { width: 360, label: 'Delayed', roomy: false, heightInTopBar: true },
-  { width: 360, label: 'Disconnected', roomy: false, heightInTopBar: true },
-  { width: 320, label: 'Delayed', roomy: true, heightInTopBar: false },
-  { width: 320, label: 'Disconnected', roomy: true, heightInTopBar: false },
+  { width: 600, label: 'Disconnected', titleShown: true, heightInTopBar: true },
+  { width: 521, label: 'Disconnected', titleShown: true, heightInTopBar: true },
+  { width: 360, label: 'Delayed', titleShown: false, heightInTopBar: true },
+  { width: 360, label: 'Disconnected', titleShown: false, heightInTopBar: true },
+  { width: 320, label: 'Delayed', titleShown: false, heightInTopBar: false },
+  { width: 320, label: 'Disconnected', titleShown: false, heightInTopBar: false },
 ];
 
 const disconnectedSync = {
@@ -89,8 +87,8 @@ const disconnectedSync = {
   data: { isRunning: false, lastSyncedHeight: 130_000, daemonHeight: -1, rpcConnected: false, blocksRemaining: 0, progress: 0, error: null },
 };
 
-for (const { width, label, roomy, heightInTopBar } of NARROW_HEADER_CASES) {
-  test(`a ${width}px phone fits the header beside "${label}" @smoke`, async ({ page }) => {
+for (const { width, label, titleShown, heightInTopBar } of NARROW_HEADER_CASES) {
+  test(`a ${width}px screen fits the header on one row beside "${label}" @smoke`, async ({ page }) => {
     await page.unroute('**/api/**');
     await stubApi(page, label === 'Disconnected'
       ? { '/api/stats': delayedStats(), '/api/sync': disconnectedSync }
@@ -99,37 +97,51 @@ for (const { width, label, roomy, heightInTopBar } of NARROW_HEADER_CASES) {
 
     await page.goto('/');
     await expect(page.locator('.status-chip-live').first()).toContainText(label);
+    await expect(page.locator('header').getByRole('link', { name: 'DeFCoN Explorer' })).toBeVisible();
     const layout = await page.evaluate(async () => {
       await document.fonts.ready;
       const title = document.querySelector('.header-brand-title') as HTMLElement;
+      const titleBox = title.getBoundingClientRect();
       const titleText = document.createRange();
       titleText.selectNodeContents(title);
+      const shown = titleBox.width > 2;
       const actions = Array.from(document.querySelectorAll('.header-top-actions .status-chip, .header-top-actions button'))
         .map((element) => element.getBoundingClientRect())
         .filter((box) => box.width > 0);
       const heightChip = document.querySelector('.header-top-actions .status-chip-height')?.getBoundingClientRect();
+      const width = (selector: string) => (document.querySelector(selector) as HTMLElement).getBoundingClientRect().width;
       return {
         titleFont: getComputedStyle(title).fontFamily.split(',')[0],
-        titleLines: title.getBoundingClientRect().height / parseFloat(getComputedStyle(title).lineHeight),
-        titleTextRight: titleText.getBoundingClientRect().right,
+        titleShown: shown,
+        titleLines: shown ? titleBox.height / parseFloat(getComputedStyle(title).lineHeight) : 0,
+        brandRight: Math.max(
+          (document.querySelector('.header-brand-logo') as HTMLElement).getBoundingClientRect().right,
+          shown ? titleText.getBoundingClientRect().right : 0,
+        ),
         firstActionLeft: Math.min(...actions.map((box) => box.left)),
         lastActionRight: Math.max(...actions.map((box) => box.right)),
-        menuWidth: (document.querySelector('.mobile-toggle') as HTMLElement).getBoundingClientRect().width,
+        actionsTop: Math.min(...actions.map((box) => box.top)),
+        actionsBottom: Math.max(...actions.map((box) => box.bottom)),
+        header: (document.querySelector('header.header') as HTMLElement).getBoundingClientRect().toJSON() as DOMRect,
+        searchWidth: width('.search-toggle'),
+        menuWidth: width('.mobile-toggle'),
         heightInTopBar: (heightChip?.width ?? 0) > 0,
         pageWidth: document.documentElement.scrollWidth,
       };
     });
 
     expect(layout.titleFont).toBe('"Space Grotesk Variable"');
-    expect(layout.titleTextRight).toBeLessThanOrEqual(layout.firstActionLeft);
+    expect(layout.titleShown).toBe(titleShown);
+    if (titleShown) expect(layout.titleLines).toBeLessThan(1.5);
+    expect(layout.brandRight).toBeLessThanOrEqual(layout.firstActionLeft);
     expect(layout.lastActionRight).toBeLessThanOrEqual(width);
+    expect(layout.actionsBottom - layout.actionsTop).toBeLessThanOrEqual(40);
+    // The top bar keeps space above and below its buttons instead of touching the header's edges.
+    expect(layout.actionsTop - layout.header.top).toBeGreaterThanOrEqual(4);
+    expect(layout.header.bottom - layout.actionsBottom).toBeGreaterThanOrEqual(4);
     expect(layout.pageWidth).toBe(width);
     expect(layout.heightInTopBar).toBe(heightInTopBar);
-    if (roomy) {
-      expect(layout.titleLines).toBeLessThan(1.5);
-      expect(layout.menuWidth).toBeGreaterThanOrEqual(38);
-    } else {
-      expect(layout.titleLines).toBeLessThan(2.5);
-    }
+    expect(layout.searchWidth).toBeGreaterThanOrEqual(40);
+    expect(layout.menuWidth).toBeGreaterThanOrEqual(40);
   });
 }

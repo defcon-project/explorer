@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   HiOutlineArrowRight,
   HiOutlineArrowTrendingUp,
@@ -8,7 +8,6 @@ import {
   HiOutlineChevronDown,
   HiOutlineChevronUp,
   HiOutlineCube,
-  HiOutlineMagnifyingGlass,
 } from 'react-icons/hi2';
 import { fetchBlockTxs, fetchDashboardOverview } from '../services/api';
 import {
@@ -22,7 +21,7 @@ import {
 import { useMarketSnapshot } from '../hooks/useMarketSnapshot';
 import type { DashboardBlockView, DashboardTxView, TxListItemView } from '../types/api';
 import './DashboardPage.css';
-import { searchPath, txPath } from '../utils/routes';
+import { txPath } from '../utils/routes';
 const TX_PREVIEW_MAX = 12;
 const REWARD_TOLERANCE = 0.0000001;
 const PROTOCOL_TX_TOLERANCE = 0.0000001;
@@ -235,8 +234,6 @@ function LatestBlockRow({ block, stakeRewardPerBlock, isExpanded, onToggle, pric
 }
 
 export default function DashboardPage() {
-  const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
   const [expandedBlockHeight, setExpandedBlockHeight] = useState<number | null>(null);
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: ['dashboard-overview'],
@@ -275,13 +272,6 @@ export default function DashboardPage() {
   const stakeRewardPerBlock =
     typeof stats?.stakingReward === 'number' && stats.stakingReward > 0 ? stats.stakingReward : null;
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = searchQuery.trim();
-    if (!query) return;
-    navigate(searchPath(query));
-  };
-
   const formatCompactCoin = (value: number) =>
     new Intl.NumberFormat('en-US', {
       notation: 'compact',
@@ -310,21 +300,6 @@ export default function DashboardPage() {
             </span>
           )}
         </div>
-
-        <form className="search-container dashboard-hero-search" onSubmit={handleSearch}>
-          <label className="sr-only" htmlFor="dashboard-search">
-            Search the explorer
-          </label>
-          <HiOutlineMagnifyingGlass className="search-icon" aria-hidden="true" />
-          <input
-            id="dashboard-search"
-            type="search"
-            className="search-input"
-            placeholder="Search block height, hash, transaction, or address"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </form>
 
       </section>
 

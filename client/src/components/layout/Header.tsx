@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   HiOutlineBars3,
@@ -7,13 +7,16 @@ import {
   HiOutlineCube,
   HiOutlineGlobeAlt,
   HiOutlineInformationCircle,
+  HiOutlineMagnifyingGlass,
   HiOutlineServerStack,
   HiOutlineSquares2X2,
   HiOutlineWrenchScrewdriver,
   HiOutlineXMark,
 } from 'react-icons/hi2';
 import HeaderNavigation, { type HeaderNavItem } from './HeaderNavigation';
+import HeaderSearch from './HeaderSearch';
 import HeaderStatusChips from './HeaderStatusChips';
+import logoUrl from '../../assets/defcon-logo-64.png';
 import './Header.css';
 
 const DEV_TOOLS_NAV_ITEM: HeaderNavItem = {
@@ -73,11 +76,43 @@ const NAV_ITEMS: HeaderNavItem[] = [
   DEV_TOOLS_NAV_ITEM,
 ];
 
+/** True when the key press happened while the user was typing somewhere. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+}
+
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchFocusRequest, setSearchFocusRequest] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const MOBILE_BREAKPOINT = 1080;
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  const openSearch = useCallback(() => {
+    setMobileOpen(false);
+    setSearchOpen(true);
+    setSearchFocusRequest((count) => count + 1);
+  }, []);
+
+  // Focus after the render that shows the narrow-screen search row.
+  useEffect(() => {
+    if (searchFocusRequest > 0) searchInputRef.current?.focus();
+  }, [searchFocusRequest]);
+
+  // "/" jumps to the search from anywhere except while typing.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+      if (isTypingTarget(event.target)) return;
+      event.preventDefault();
+      openSearch();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [openSearch]);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -92,6 +127,7 @@ export default function Header() {
     const onResize = () => {
       if (window.innerWidth > MOBILE_BREAKPOINT) {
         setMobileOpen(false);
+        setSearchOpen(false);
       }
     };
 
@@ -104,17 +140,33 @@ export default function Header() {
       <div className="header-shell container">
         <div className="header-top">
           <Link to="/" className="header-brand" onClick={closeMobile}>
+            <img className="header-brand-logo" src={logoUrl} alt="" width={32} height={32} />
             <span className="header-brand-title">DeFCoN Explorer</span>
-            <span className="header-brand-subtitle">Live Network Monitor</span>
           </Link>
+
+          <HeaderSearch ref={searchInputRef} open={searchOpen} onClose={closeSearch} />
 
           <div className="header-top-actions">
             <HeaderStatusChips />
 
             <button
               type="button"
-              className="mobile-toggle"
-              onClick={() => setMobileOpen((prev) => !prev)}
+              className="header-icon-button search-toggle"
+              onClick={searchOpen ? closeSearch : openSearch}
+              aria-expanded={searchOpen}
+              aria-controls="header-search"
+              aria-label={searchOpen ? 'Close search' : 'Open search'}
+            >
+              {searchOpen ? <HiOutlineXMark /> : <HiOutlineMagnifyingGlass />}
+            </button>
+
+            <button
+              type="button"
+              className="header-icon-button mobile-toggle"
+              onClick={() => {
+                setSearchOpen(false);
+                setMobileOpen((prev) => !prev);
+              }}
               aria-expanded={mobileOpen}
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             >

@@ -5,6 +5,11 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AutoRefreshProvider } from './context/AutoRefreshContext';
 import { queryClient } from './queryClient';
+// Self-hosted fonts: the production CSP only allows fonts and stylesheets from this origin.
+import '@fontsource-variable/space-grotesk/wght.css';
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource/ibm-plex-mono/latin-600.css';
 import './styles/globals.css';
 import { readBootData } from './utils/bootData';
 import { watchChunkFailures } from './utils/releaseReload';

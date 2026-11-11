@@ -22,7 +22,6 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchCoin, fetchLatestBlocks, fetchMasternodeSummary, fetchStats } from '../services/api';
 import { useChartAnimation } from '../utils/chartAnimation';
 import { formatNumber, formatDifficulty, formatSmallPrice } from '../utils/formatters';
-import { useTheme } from '../context/ThemeContext';
 import { usePageVisibility } from '../hooks/usePageVisibility';
 import { useMarketSnapshot } from '../hooks/useMarketSnapshot';
 import './PageStyles.css';
@@ -41,9 +40,9 @@ function formatDuration(seconds: number): string {
   return `${m}m`;
 }
 
+const chartColor = 'var(--chart-series-1)';
+
 export default function MiningPage() {
-  const { theme } = useTheme();
-  const chartColor = theme === 'dark' ? '#7ab9ff' : '#2f8fff';
   const isPageVisible = usePageVisibility();
   const chartAnimation = useChartAnimation();
 

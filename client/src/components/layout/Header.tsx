@@ -7,14 +7,11 @@ import {
   HiOutlineCube,
   HiOutlineGlobeAlt,
   HiOutlineInformationCircle,
-  HiOutlineMoon,
   HiOutlineServerStack,
   HiOutlineSquares2X2,
-  HiOutlineSun,
   HiOutlineWrenchScrewdriver,
   HiOutlineXMark,
 } from 'react-icons/hi2';
-import { useTheme } from '../../context/ThemeContext';
 import HeaderNavigation, { type HeaderNavItem } from './HeaderNavigation';
 import HeaderStatusChips from './HeaderStatusChips';
 import './Header.css';
@@ -77,7 +74,6 @@ const NAV_ITEMS: HeaderNavItem[] = [
 ];
 
 export default function Header() {
-  const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const MOBILE_BREAKPOINT = 1080;
 
@@ -114,16 +110,6 @@ export default function Header() {
 
           <div className="header-top-actions">
             <HeaderStatusChips />
-
-            <button
-              type="button"
-              className="theme-toggle"
-              onClick={toggleTheme}
-              title="Toggle theme"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <HiOutlineSun /> : <HiOutlineMoon />}
-            </button>
 
             <button
               type="button"

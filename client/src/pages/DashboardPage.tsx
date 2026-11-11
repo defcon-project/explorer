@@ -63,10 +63,11 @@ function rewardRoleLabel(role: RewardRole): string {
   return 'Transfer';
 }
 
+/** The server buckets flow by UTC hour, so the hour is shown in UTC too, not in the browser's time zone. */
 function formatFlowHour(hourIso: string): string {
   const d = new Date(hourIso);
   if (Number.isNaN(d.getTime())) return hourIso.slice(11, 16);
-  return `${String(d.getHours()).padStart(2, '0')}:00`;
+  return `${String(d.getUTCHours()).padStart(2, '0')}:00`;
 }
 
 function formatMarketAge(ageSeconds: number | null | undefined): string | null {
@@ -465,7 +466,7 @@ export default function DashboardPage() {
                 <div
                   key={point.hour}
                   className="flow-bar-item"
-                  title={`${formatFlowHour(point.hour)} | ${point.blocks} blocks | ${point.txs} txs`}
+                  title={`${formatFlowHour(point.hour)} UTC | ${point.blocks} blocks | ${point.txs} txs`}
                 >
                   <span className="flow-bar flow-bar-blocks" style={{ height: `${point.blocksPct}%` }} />
                   <span className="flow-bar flow-bar-txs" style={{ height: `${point.txsPct}%` }} />
@@ -476,7 +477,7 @@ export default function DashboardPage() {
               <span><i className="flow-dot flow-dot-blocks" /> Blocks/hour</span>
               <span><i className="flow-dot flow-dot-txs" /> Txs/hour</span>
               <span>
-                {formatFlowHour(flowBars[0].hour)} - {formatFlowHour(flowBars[flowBars.length - 1].hour)}
+                {formatFlowHour(flowBars[0].hour)} - {formatFlowHour(flowBars[flowBars.length - 1].hour)} UTC
               </span>
             </div>
           </>

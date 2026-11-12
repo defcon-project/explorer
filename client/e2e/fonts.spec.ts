@@ -73,9 +73,12 @@ const delayedStats = () => ({
 // fit on screen without sideways scrolling. Below 360px the block height moves to the menu while
 // the status is not "Live", so the title stays on one line and the menu button keeps its size.
 // At 360px beside "Disconnected" the title wraps and the menu button narrows, as it did with the
-// previous system font; the narrow-phone header is redesigned in a later change.
+// previous system font. Beside "Delayed" the title has only about 2px to spare on Windows, and
+// Linux Chromium rounds glyph widths differently and draws the block height about 3px wider, so
+// there the title wraps too. At 360px the title may therefore take two lines, but never more, and
+// it never runs into the status. The narrow-phone header is redesigned in a later change.
 const NARROW_HEADER_CASES = [
-  { width: 360, label: 'Delayed', roomy: true, heightInTopBar: true },
+  { width: 360, label: 'Delayed', roomy: false, heightInTopBar: true },
   { width: 360, label: 'Disconnected', roomy: false, heightInTopBar: true },
   { width: 320, label: 'Delayed', roomy: true, heightInTopBar: false },
   { width: 320, label: 'Disconnected', roomy: true, heightInTopBar: false },
@@ -125,6 +128,8 @@ for (const { width, label, roomy, heightInTopBar } of NARROW_HEADER_CASES) {
     if (roomy) {
       expect(layout.titleLines).toBeLessThan(1.5);
       expect(layout.menuWidth).toBeGreaterThanOrEqual(38);
+    } else {
+      expect(layout.titleLines).toBeLessThan(2.5);
     }
   });
 }

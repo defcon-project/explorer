@@ -441,7 +441,19 @@
 }
 
 @media (max-width: 420px) {
+  .header-brand-title {
+    font-size: 1rem;
+  }
+
   .header-status-chips:not(.compact) .status-chip-height .status-chip-label {
+    display: none;
+  }
+}
+
+/* Below 360px a longer status word ("Disconnected", "Sync error") leaves no room for the title,
+   the block height and the menu button together. The block height stays in the menu. */
+@media (max-width: 359px) {
+  .header-status-chips:not(.compact) .status-chip-live.degraded ~ .status-chip-height {
     display: none;
   }
 }

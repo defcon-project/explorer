@@ -3,7 +3,7 @@
   color-scheme: dark;
 
   /* Shared visual scale. Colour tokens follow below; these keep layout and motion consistent. */
-  --font-sans: 'Space Grotesk', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Space Grotesk Variable', 'Space Grotesk', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --space-1: 0.25rem;

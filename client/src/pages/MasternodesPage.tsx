@@ -20,12 +20,15 @@ import {
 } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import {
+  fetchActiveMasternodeVersions,
   fetchMasternodeDistribution,
-  fetchMasternodeNodes,
   fetchMasternodeSummary,
+  fetchMasternodes,
 } from '../services/api';
 import { useChartAnimation } from '../utils/chartAnimation';
-import { formatAge, formatNumber } from '../utils/formatters';
+import { formatNumber } from '../utils/formatters';
+import MasternodeTable from './masternodes/MasternodeTable';
+import { buildRows } from './masternodes/masternodeRows';
 import './PageStyles.css';
 import './MasternodesPage.css';
 
@@ -79,18 +82,6 @@ function isActiveMasternodeStatus(status: string | null | undefined): boolean {
   return normalized === 'ENABLED' || normalized === 'POSE_PENALTY';
 }
 
-function statusLabel(status: string | null | undefined): string {
-  const normalized = String(status || '').trim().toUpperCase();
-  if (normalized === 'POSE_PENALTY') return 'PoSe Penalty';
-  if (normalized === 'ENABLED') return 'Enabled';
-  return normalized || 'Unknown';
-}
-
-function shortService(node: { ip?: string | null; port?: number | null; service?: string | null }): string {
-  if (node.ip) return node.port ? `${node.ip}:${node.port}` : node.ip;
-  return node.service || 'Unknown';
-}
-
 export default function MasternodesPage() {
   const [activeFilter, setActiveFilter] = useState<MnFilter>(null);
   const summaryQuery = useQuery({
@@ -103,9 +94,16 @@ export default function MasternodesPage() {
     queryFn: fetchMasternodeDistribution,
     staleTime: 60_000,
   });
+  // The full snapshot: every node with its proTxHash and payout address (the paged list has neither).
   const nodesQuery = useQuery({
-    queryKey: ['masternodes', 'nodes', 'active-list'],
-    queryFn: () => fetchMasternodeNodes({ limit: 500 }),
+    queryKey: ['masternodes', 'snapshot'],
+    queryFn: fetchMasternodes,
+    staleTime: 60_000,
+  });
+  // Last-known wallet versions, matched to the list by registration (proTxHash), never by IP.
+  const versionsQuery = useQuery({
+    queryKey: ['masternodes', 'active-versions'],
+    queryFn: fetchActiveMasternodeVersions,
     staleTime: 60_000,
   });
   const chartAnimation = useChartAnimation();
@@ -177,6 +175,18 @@ export default function MasternodesPage() {
     return activeNodes.filter((node) => node.provider === activeFilter.value);
   }, [activeFilter, activeNodes, topCountryCodes]);
 
+  const tableRows = useMemo(
+    () => buildRows(visibleNodes, versionsQuery.data?.nodes ?? null),
+    [visibleNodes, versionsQuery.data],
+  );
+  // A failed background refresh keeps showing the last good snapshot; only a first load fails here.
+  const nodesError =
+    nodesQuery.error != null && !nodesQuery.data
+      ? ((nodesQuery.error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ||
+          (nodesQuery.error as Error)?.message ||
+          'Failed to load masternodes')
+      : null;
+
   const handleCountryFilter = (entry: ChartSlice) => {
     setActiveFilter((current) =>
       current?.type === 'country' && current.value === entry.countryCode
@@ -212,8 +222,6 @@ export default function MasternodesPage() {
         <p className="page-subtitle">Live masternode endpoints with country and hosting provider distribution</p>
         <div className="mn-header-pills">
           <span className="mn-header-pill">Live RPC snapshot</span>
-          <span className="mn-header-pill">{loading ? 'Loading providers...' : `${taggedCoveragePct.toFixed(1)}% tagged coverage`}</span>
-          <span className="mn-header-pill">{loading ? 'Loading health...' : `${onlineShare.toFixed(1)}% active`}</span>
         </div>
       </div>
 
@@ -420,81 +428,25 @@ export default function MasternodesPage() {
         </div>
       </div>
 
-      <div className="card mn-panel-card">
-        <div className="card-header">
-          <div>
-            <h2 className="card-title">Active Masternodes</h2>
-            <p className="mn-panel-subtitle">ENABLED and POSE_PENALTY nodes only.</p>
-          </div>
-          <div className="mn-active-filter-actions">
-            <span className="mn-panel-metric">
-              {nodesLoading ? '...' : `${formatNumber(visibleNodes.length)} visible`}
-            </span>
-            {activeFilter && (
-              <>
-                <span className="badge badge-accent">
-                  {activeFilter.type === 'country' ? 'Country' : 'Provider'}: {activeFilter.label}
-                </span>
-                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setActiveFilter(null)}>
-                  Show all
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {nodesLoading ? (
-          <div className="placeholder-content" style={{ padding: '2.5rem' }}>
-            <p className="text-muted">Loading active masternodes...</p>
-          </div>
-        ) : visibleNodes.length === 0 ? (
-          <div className="placeholder-content" style={{ padding: '2.5rem' }}>
-            <p className="text-muted">No active masternodes match this filter.</p>
-          </div>
-        ) : (
-          <div className="table-wrapper mn-active-table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Service</th>
-                  <th>Status</th>
-                  <th>Country</th>
-                  <th>Provider</th>
-                  <th>Source</th>
-                  <th>Last seen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleNodes.map((node) => (
-                  <tr key={node.id}>
-                    <td>
-                      <div className="mono mn-service-cell">{shortService(node)}</div>
-                    </td>
-                    <td>
-                      <span className={`badge ${node.status === 'POSE_PENALTY' ? 'warning' : 'success'}`}>
-                        {statusLabel(node.status)}
-                      </span>
-                    </td>
-                    <td>
-                      <span>{node.countryName || 'Unknown'}</span>
-                      <span className="text-muted mono mn-country-code">{node.countryCode || 'XX'}</span>
-                    </td>
-                    <td>{node.provider || 'Unknown'}</td>
-                    <td>
-                      <span className={node.providerSource === 'tag' ? 'mn-tag-pill' : 'badge'}>
-                        {node.providerSource === 'tag' ? 'Tagged' : 'Auto'}
-                      </span>
-                    </td>
-                    <td className="text-muted">
-                      {typeof node.lastSeen === 'number' ? formatAge(node.lastSeen) : 'N/A'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <MasternodeTable
+        rows={tableRows}
+        loading={nodesLoading}
+        error={nodesError}
+        versionsLoading={versionsQuery.isPending}
+        versionsUnavailable={versionsQuery.isError}
+        pageFilter={
+          activeFilter && (
+            <>
+              <span className="badge badge-accent">
+                {activeFilter.type === 'country' ? 'Country' : 'Provider'}: {activeFilter.label}
+              </span>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => setActiveFilter(null)}>
+                Show all
+              </button>
+            </>
+          )
+        }
+      />
     </div>
   );
 }

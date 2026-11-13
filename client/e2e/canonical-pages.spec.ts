@@ -155,7 +155,7 @@ test('an address search opens the address page with its flows @smoke', async ({ 
   await page.goto(`/search?q=${SENDER}`);
 
   await expect(page).toHaveURL(new RegExp(`/address/${SENDER}$`));
-  await expect(page.getByRole('heading', { name: 'Address', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: SENDER, exact: true, level: 1 })).toBeVisible();
   await expect(page.locator('.stat-card').filter({ hasText: 'Transactions' })).toContainText('1');
   // One line per transaction; it paid RECIPIENT and kept the change, so it is a send.
   const row = page.locator('.address-tx-row');

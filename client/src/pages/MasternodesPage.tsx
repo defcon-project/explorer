@@ -5,19 +5,6 @@ import {
   HiOutlineServerStack,
   HiOutlineTag,
 } from 'react-icons/hi2';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  BarChart,
-  Bar,
-} from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import {
   fetchActiveMasternodeVersions,
@@ -25,55 +12,17 @@ import {
   fetchMasternodeSummary,
   fetchMasternodes,
 } from '../services/api';
-import { useChartAnimation } from '../utils/chartAnimation';
 import { formatNumber } from '../utils/formatters';
+import { CountryRanking, ProviderRanking, type CountryRank, type ProviderRank } from './masternodes/DistributionLists';
 import MasternodeTable from './masternodes/MasternodeTable';
 import { buildRows } from './masternodes/masternodeRows';
 import './PageStyles.css';
 import './MasternodesPage.css';
 
-interface ChartSlice {
-  name: string;
-  value: number;
-  color: string;
-  countryCode: string;
-}
-
-interface ProviderChartSlice {
-  name: string;
-  tagged: number;
-  auto: number;
-  total: number;
-  provider: string;
-}
-
 type MnFilter =
   | { type: 'country'; value: string; label: string }
   | { type: 'provider'; value: string; label: string }
   | null;
-
-const chartColors = [
-  '#1f64d8',
-  '#2f8fff',
-  '#58a8ff',
-  '#4f7fd8',
-  '#5cbfff',
-  '#3f6fc6',
-  '#79b6ff',
-  '#2f5fae',
-];
-
-const chartTooltipStyle = {
-  background: 'var(--surface-elevated)',
-  border: '1px solid var(--border)',
-  borderRadius: '8px',
-  color: 'var(--text)',
-  boxShadow: 'var(--card-shadow)',
-} as const;
-
-const chartTooltipTextStyle = {
-  color: 'var(--text)',
-} as const;
 
 const OTHERS_KEY = '__others';
 
@@ -106,7 +55,6 @@ export default function MasternodesPage() {
     queryFn: fetchActiveMasternodeVersions,
     staleTime: 60_000,
   });
-  const chartAnimation = useChartAnimation();
 
   const summary = summaryQuery.data;
   const countries = distributionQuery.data?.countries || [];
@@ -124,35 +72,25 @@ export default function MasternodesPage() {
 
   const topCountries = useMemo(() => countries.slice(0, 8), [countries]);
 
-  const chartData: ChartSlice[] = useMemo(() => {
-    const rows: ChartSlice[] = topCountries.map((country, index) => ({
+  // The eight largest countries, then everything else as one "Others" row.
+  const countryRanks: CountryRank[] = useMemo(() => {
+    const rows: CountryRank[] = topCountries.map((country) => ({
+      key: country.countryCode,
       name: country.countryName,
-      value: country.count,
-      color: chartColors[index % chartColors.length],
-      countryCode: country.countryCode,
+      count: country.count,
     }));
-
     const restCount = countries.slice(8).reduce((sum, item) => sum + item.count, 0);
-    if (restCount > 0) {
-      rows.push({
-        name: 'Others',
-        value: restCount,
-        color: '#6f8eb2',
-        countryCode: OTHERS_KEY,
-      });
-    }
-
+    if (restCount > 0) rows.push({ key: OTHERS_KEY, name: 'Others', count: restCount });
     return rows;
   }, [countries, topCountries]);
 
-  const providerChartData: ProviderChartSlice[] = useMemo(
+  const providerRanks: ProviderRank[] = useMemo(
     () =>
       providers.slice(0, 10).map((provider) => ({
-        name: provider.provider,
-        tagged: provider.tagged ?? 0,
-        auto: provider.auto ?? provider.count,
-        total: provider.count,
         provider: provider.provider,
+        count: provider.count,
+        tagged: provider.tagged ?? 0,
+        auto: provider.auto ?? Math.max(0, provider.count - (provider.tagged ?? 0)),
       })),
     [providers],
   );
@@ -187,15 +125,15 @@ export default function MasternodesPage() {
           'Failed to load masternodes')
       : null;
 
-  const handleCountryFilter = (entry: ChartSlice) => {
+  const handleCountryFilter = (entry: CountryRank) => {
     setActiveFilter((current) =>
-      current?.type === 'country' && current.value === entry.countryCode
+      current?.type === 'country' && current.value === entry.key
         ? null
-        : { type: 'country', value: entry.countryCode, label: entry.name },
+        : { type: 'country', value: entry.key, label: entry.name },
     );
   };
 
-  const handleProviderFilter = (entry: ProviderChartSlice) => {
+  const handleProviderFilter = (entry: ProviderRank) => {
     setActiveFilter((current) =>
       current?.type === 'provider' && current.value === entry.provider
         ? null
@@ -283,147 +221,46 @@ export default function MasternodesPage() {
             <h2 className="card-title">Masternodes by Country</h2>
             <span className="mn-panel-metric">{loading ? '...' : formatNumber(totalNodes)} nodes</span>
           </div>
-          <p className="mn-panel-subtitle">Live country distribution from the current masternode snapshot.</p>
+          <p className="mn-panel-subtitle">Active nodes per country in the current snapshot; press a row to filter the table.</p>
 
           {loading ? (
             <div className="placeholder-content" style={{ padding: '2.5rem' }}>
               <p className="text-muted">Loading country distribution...</p>
             </div>
-          ) : chartData.length === 0 ? (
+          ) : countryRanks.length === 0 ? (
             <div className="placeholder-content" style={{ padding: '2.5rem' }}>
               <p className="text-muted">No country distribution available</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={95}
-                  innerRadius={52}
-                  dataKey="value"
-                  paddingAngle={2}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  {...chartAnimation}
-                >
-                    {chartData.map((entry) => (
-                      <Cell
-                        key={`${entry.countryCode}-${entry.name}`}
-                        fill={entry.color}
-                        opacity={
-                          !activeFilter ||
-                          (activeFilter.type === 'country' && activeFilter.value === entry.countryCode)
-                            ? 1
-                            : 0.35
-                        }
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => handleCountryFilter(entry)}
-                      />
-                    ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={chartTooltipStyle}
-                  labelStyle={chartTooltipTextStyle}
-                  itemStyle={chartTooltipTextStyle}
-                  formatter={(value: number) => [formatNumber(value), 'Nodes']}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <CountryRanking
+              rows={countryRanks}
+              total={totalNodes}
+              activeKey={activeFilter?.type === 'country' ? activeFilter.value : null}
+              onToggle={handleCountryFilter}
+            />
           )}
         </div>
 
         <div className="card mn-panel-card">
           <div className="card-header">
             <h2 className="card-title">Hosting Providers</h2>
-            <span className="mn-panel-metric">{loading ? '...' : formatNumber(providerChartData.length)} visible providers</span>
+            <span className="mn-panel-metric">{loading ? '...' : formatNumber(providerRanks.length)} largest providers</span>
           </div>
-          <p className="mn-panel-subtitle">Stacked view of auto-detected vs CIDR-tagged provider attribution.</p>
+          <p className="mn-panel-subtitle">The largest providers, up to ten; each bar splits auto-detected nodes from nodes in tagged address ranges.</p>
           {loading ? (
             <div className="placeholder-content" style={{ padding: '2.5rem' }}>
               <p className="text-muted">Resolving providers...</p>
             </div>
-          ) : providerChartData.length === 0 ? (
+          ) : providerRanks.length === 0 ? (
             <div className="placeholder-content" style={{ padding: '2.5rem' }}>
               <p className="text-muted">No provider data available</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={providerChartData} layout="vertical" margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
-                <CartesianGrid stroke="var(--border-light)" strokeDasharray="3 3" />
-                <XAxis type="number" stroke="var(--text-muted)" />
-                <YAxis type="category" dataKey="name" stroke="var(--text-muted)" width={120} />
-                <Tooltip
-                  contentStyle={chartTooltipStyle}
-                  labelStyle={chartTooltipTextStyle}
-                  itemStyle={chartTooltipTextStyle}
-                  formatter={(value: number, key, item) => {
-                    const entry = item.payload as ProviderChartSlice;
-                    if (key === 'tagged') {
-                      const share = entry.total > 0 ? (entry.tagged / entry.total) * 100 : 0;
-                      return [`${formatNumber(value)} tagged (${share.toFixed(1)}%)`, 'Tagged ranges'];
-                    }
-                    if (key === 'auto') {
-                      const share = entry.total > 0 ? (entry.auto / entry.total) * 100 : 0;
-                      return [`${formatNumber(value)} auto (${share.toFixed(1)}%)`, 'Auto detected'];
-                    }
-                    return [formatNumber(value), String(key)];
-                  }}
-                  labelFormatter={(label, payload) => {
-                    const item = payload?.[0]?.payload as ProviderChartSlice | undefined;
-                    if (!item) return String(label);
-                    return `${item.name} - ${formatNumber(item.total)} nodes`;
-                  }}
-                />
-                <Bar
-                  dataKey="auto"
-                  stackId="provider"
-                  fill="#2f8fff"
-                  name="Auto detected"
-                  onClick={(entry: { payload?: ProviderChartSlice }) => {
-                    if (entry?.payload) handleProviderFilter(entry.payload);
-                  }}
-                  {...chartAnimation}
-                >
-                  {providerChartData.map((entry) => (
-                    <Cell
-                      key={`auto-${entry.provider}`}
-                      opacity={
-                        !activeFilter ||
-                        (activeFilter.type === 'provider' && activeFilter.value === entry.provider)
-                          ? 1
-                          : 0.35
-                      }
-                      style={{ cursor: 'pointer' }}
-                    />
-                  ))}
-                </Bar>
-                <Bar
-                  dataKey="tagged"
-                  stackId="provider"
-                  fill="#2bc48a"
-                  name="Tagged ranges"
-                  onClick={(entry: { payload?: ProviderChartSlice }) => {
-                    if (entry?.payload) handleProviderFilter(entry.payload);
-                  }}
-                  {...chartAnimation}
-                >
-                  {providerChartData.map((entry) => (
-                    <Cell
-                      key={`tagged-${entry.provider}`}
-                      opacity={
-                        !activeFilter ||
-                        (activeFilter.type === 'provider' && activeFilter.value === entry.provider)
-                          ? 1
-                          : 0.35
-                      }
-                      style={{ cursor: 'pointer' }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <ProviderRanking
+              providers={providerRanks}
+              activeProvider={activeFilter?.type === 'provider' ? activeFilter.value : null}
+              onToggle={handleProviderFilter}
+            />
           )}
         </div>
       </div>
@@ -433,7 +270,7 @@ export default function MasternodesPage() {
         loading={nodesLoading}
         error={nodesError}
         versionsLoading={versionsQuery.isPending}
-        versionsUnavailable={versionsQuery.isError}
+        versionsUnavailable={versionsQuery.isError && !versionsQuery.data}
         pageFilter={
           activeFilter && (
             <>

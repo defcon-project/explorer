@@ -18,6 +18,7 @@ import {
   type SortKey,
   type StatusFilter,
   type TableState,
+  UNKNOWN_VERSION,
 } from './masternodeRows';
 import './MasternodeTable.css';
 
@@ -29,7 +30,7 @@ interface MasternodeTableProps {
   versionsLoading: boolean;
   /** True when the version snapshot could not be loaded: every version then shows as unknown. */
   versionsUnavailable: boolean;
-  /** A chart filter chosen on the page (country or provider), shown with a way to clear it. */
+  /** A country or provider filter chosen on the page (a ranking row), shown with a way to clear it. */
   pageFilter?: ReactNode;
 }
 
@@ -123,7 +124,28 @@ export default function MasternodeTable({
     }, SEARCH_DELAY_MS);
   };
 
-  const searched = useMemo(() => filterRows(rows, state.q, 'all'), [rows, state.q]);
+  // A version filter needs the versions: until they arrive every row would look unknown, so the
+  // table would claim "no match" for a real version and "all of them" for unknown.
+  const waitingForVersions = Boolean(state.version) && versionsLoading;
+  const showingRows = !loading && !error && !waitingForVersions;
+
+  // Arriving with a version filter (from the Network page or a shared link), bring the table into
+  // view once, when its rows are shown: the rankings above it would otherwise fill the screen.
+  const scrollOnArrival = useRef(Boolean(state.version));
+  useEffect(() => {
+    if (!scrollOnArrival.current || !showingRows) return;
+    scrollOnArrival.current = false;
+    const card = cardRef.current;
+    if (!card) return;
+    const siteHeader = document.querySelector('header.header')?.getBoundingClientRect().height ?? 0;
+    window.scrollTo({ top: card.getBoundingClientRect().top + window.scrollY - siteHeader });
+  }, [showingRows]);
+
+  // While waiting for the versions nothing is matched yet, so the status counts claim nothing either.
+  const searched = useMemo(
+    () => (waitingForVersions ? [] : filterRows(rows, state.q, 'all', state.version)),
+    [rows, state.q, state.version, waitingForVersions],
+  );
   const matched = useMemo(() => filterRows(searched, '', state.status), [searched, state.status]);
   const sorted = useMemo(() => sortRows(matched, state.sort, state.dir), [matched, state.sort, state.dir]);
   const pages = pageCount(sorted.length);
@@ -152,25 +174,27 @@ export default function MasternodeTable({
     body = <StatePanel title="Loading masternodes..." />;
   } else if (error) {
     body = <StatePanel tone="danger" title="Masternodes could not be loaded" description={error} />;
+  } else if (waitingForVersions) {
+    body = <StatePanel title="Loading versions..." description="The table is filtered by version, so it waits for them." />;
   } else if (rows.length === 0) {
     body = (
       <StatePanel
         title="No active masternodes"
-        description={pageFilter ? 'No active masternode matches the chosen chart filter.' : 'The current snapshot lists no active masternode.'}
+        description={pageFilter ? 'No active masternode matches the chosen country or provider.' : 'The current snapshot lists no active masternode.'}
       />
     );
   } else if (matched.length === 0) {
     body = (
       <StatePanel
         title="No masternodes match"
-        description={state.q ? `Nothing matches "${state.q}" with this status filter.` : 'No masternode has this status.'}
+        description={state.q ? `Nothing matches "${state.q}" with these filters.` : 'No masternode matches these filters.'}
         action={
           <button
             type="button"
             className="btn btn-sm btn-secondary"
             onClick={() => {
               window.clearTimeout(pendingSearch.current);
-              update({ q: '', status: 'all', page: 1 });
+              update({ q: '', status: 'all', version: '', page: 1 });
             }}
           >
             Clear search and filter
@@ -247,12 +271,22 @@ export default function MasternodeTable({
           <p className="mn-panel-subtitle">ENABLED and POSE_PENALTY nodes from the current snapshot.</p>
         </div>
         <div className="mn-active-filter-actions">
-          {!loading && !error && (
+          {showingRows && (
             <span className="mn-panel-metric" aria-live="polite">
               {matched.length === rows.length
                 ? `${formatNumber(rows.length)} nodes`
                 : `${formatNumber(matched.length)} of ${formatNumber(rows.length)}`}
             </span>
+          )}
+          {state.version && (
+            <>
+              <span className="badge badge-accent mn-version-badge">
+                Version: {state.version === UNKNOWN_VERSION ? 'unknown' : state.version}
+              </span>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => update({ version: '', page: 1 })}>
+                Clear version filter
+              </button>
+            </>
           )}
           {pageFilter}
         </div>

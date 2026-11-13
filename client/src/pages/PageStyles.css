@@ -388,3 +388,14 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Nodes page: the DNS seeder pager and its endpoint count. */
+.dns-seeder-pager {
+  padding: 0 1rem 1rem;
+}
+
+.dns-seeder-count {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  text-align: center;
+}

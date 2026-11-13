@@ -8,6 +8,12 @@
   white-space: nowrap;
 }
 
+/* A version typed into the address can be long and unbroken: let it wrap inside the card. */
+.mn-version-badge {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .mn-table-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

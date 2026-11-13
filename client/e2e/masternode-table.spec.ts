@@ -147,7 +147,7 @@ test('at tablet widths the table never runs past its card @smoke', async ({ page
   test.skip(testInfo.project.name.includes('mobile'), 'Sets its own window widths; one project is enough.');
   await stubApi(page, api());
   // Below about 900 px the six columns do not fit, so rows turn into cards there.
-  for (const width of [700, 744, 820, 900, 960, 1024]) {
+  for (const width of [700, 744, 820, 900, 901, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/masternodes');
     await expect(rows(page)).toHaveCount(50);

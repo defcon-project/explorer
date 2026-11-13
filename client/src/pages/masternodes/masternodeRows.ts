@@ -11,6 +11,8 @@ export type SortDirection = 'asc' | 'desc';
 export interface TableState {
   q: string;
   status: StatusFilter;
+  /** An exact wallet version to show, or 'unknown' for nodes without one; '' shows every version. */
+  version: string;
   sort: SortKey;
   dir: SortDirection;
   page: number;
@@ -36,7 +38,8 @@ export interface MasternodeRow {
 export const PAGE_SIZE = 50;
 const SORT_KEYS: SortKey[] = ['service', 'status', 'version', 'country', 'provider', 'payout'];
 const STATUS_FILTERS: StatusFilter[] = ['all', 'enabled', 'pose_penalty'];
-export const DEFAULT_STATE: TableState = { q: '', status: 'all', sort: 'service', dir: 'asc', page: 1 };
+export const DEFAULT_STATE: TableState = { q: '', status: 'all', version: '', sort: 'service', dir: 'asc', page: 1 };
+export const UNKNOWN_VERSION = 'unknown';
 
 /**
  * Both endpoints name a registration by proTxHash, else by id (masternodeVersions.service builds its
@@ -102,6 +105,7 @@ export function readTableState(params: URLSearchParams): TableState {
   return {
     q: params.get('q') ?? '',
     status: status && STATUS_FILTERS.includes(status) ? status : DEFAULT_STATE.status,
+    version: (params.get('version') ?? '').trim().slice(0, 64),
     sort: SORT_KEYS.includes(sort) ? sort : DEFAULT_STATE.sort,
     dir: SORT_KEYS.includes(sort) ? dir : DEFAULT_STATE.dir,
     page: Number.isSafeInteger(page) && page >= 1 ? page : DEFAULT_STATE.page,
@@ -114,15 +118,21 @@ export function writeTableState(params: URLSearchParams, state: TableState): URL
   const set = (key: string, value: string, fallback: string) => (value === fallback ? next.delete(key) : next.set(key, value));
   set('q', state.q, '');
   set('status', state.status, DEFAULT_STATE.status);
+  set('version', state.version, DEFAULT_STATE.version);
   set('sort', `${state.dir === 'desc' ? '-' : ''}${state.sort}`, DEFAULT_STATE.sort);
   set('page', String(state.page), String(DEFAULT_STATE.page));
   return next;
 }
 
-/** Rows matching the search (service, proTx, payout address, provider or country) and the status. */
-export function filterRows(rows: MasternodeRow[], q: string, status: StatusFilter): MasternodeRow[] {
+/**
+ * Rows matching the search (service, proTx, payout address, provider or country), the status and,
+ * when given, the exact version ('unknown' for nodes without one).
+ */
+export function filterRows(rows: MasternodeRow[], q: string, status: StatusFilter, version = ''): MasternodeRow[] {
   const needle = q.trim().toLowerCase();
   return rows.filter((row) => {
+    if (version === UNKNOWN_VERSION && row.version != null) return false;
+    if (version && version !== UNKNOWN_VERSION && row.version !== version) return false;
     if (status === 'enabled' && row.status !== 'ENABLED') return false;
     if (status === 'pose_penalty' && row.status !== 'POSE_PENALTY') return false;
     if (!needle) return true;

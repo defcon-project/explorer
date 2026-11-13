@@ -9,6 +9,7 @@ import {
   HiOutlineArrowTrendingUp,
 } from 'react-icons/hi2';
 import { fetchBlock, fetchBlockTxs } from '../services/api';
+import BlockRoleRows from '../components/BlockRoleRows';
 import { formatNumber, truncateHash, formatAge, formatDate, formatBytes, formatCoin } from '../utils/formatters';
 import { blockPath, txPath } from '../utils/routes';
 import CopyButton from '../components/ui/CopyButton';
@@ -100,6 +101,7 @@ function BlockDetailView({ hashOrHeight }: { hashOrHeight: string | undefined })
             <div className="detail-label"><HiOutlineClock /> Timestamp</div>
             <div className="detail-value">{formatDate(block.time)} ({formatAge(block.time)})</div>
           </div>
+          <BlockRoleRows block={block} />
           <div className="detail-row">
             <div className="detail-label">Height</div>
             <div className="detail-value">{formatNumber(block.height)}</div>

@@ -89,7 +89,7 @@ test('PoSe timeline controls update a rendered chart state @smoke', async ({ pag
   await stubApi(page, { '/api/v1/masternodes/ban-waves': banWaveFixture });
 
   await page.goto('/ban-detection');
-  await expect(page.getByRole('heading', { name: 'Ban Detection' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'PoSe Watch' })).toBeVisible();
   await expect(page.locator('.recharts-responsive-container').first()).toBeVisible();
 
   const timeWindow = page.getByRole('tablist', { name: 'Time window' });

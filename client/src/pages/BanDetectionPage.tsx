@@ -250,7 +250,7 @@ export function BanDetectionPage() {
             <div className="bd-hero-kicker">Monitoring</div>
           <h1 className="page-title">
             <HiOutlineFire style={{ verticalAlign: '-0.15em', marginRight: '0.4rem' }} />
-            Ban Detection
+            PoSe Watch
           </h1>
           <p className="page-subtitle">
             Current masternode state and confirmed PoSe ban history. Compare events after

@@ -22,6 +22,7 @@ import {
 import { useMarketSnapshot } from '../hooks/useMarketSnapshot';
 import type { DashboardBlockView, DashboardTxView, TxListItemView } from '../types/api';
 import './DashboardPage.css';
+import { searchPath, txPath } from '../utils/routes';
 const TX_PREVIEW_MAX = 12;
 const REWARD_TOLERANCE = 0.0000001;
 const PROTOCOL_TX_TOLERANCE = 0.0000001;
@@ -181,7 +182,7 @@ function LatestBlockRow({ block, stakeRewardPerBlock, isExpanded, onToggle, pric
                 return (
                   <div key={tx.txid} className="latest-inline-item">
                     <div className="latest-inline-main">
-                      <Link to={`/searchv2?q=${encodeURIComponent(tx.txid)}`} className="mono hash">
+                      <Link to={txPath(tx.txid)} className="mono hash">
                         {truncateHash(tx.txid, 14)}
                       </Link>
                       {tx.isDonation && <span className="badge donate">Donate</span>}
@@ -278,7 +279,7 @@ export default function DashboardPage() {
     e.preventDefault();
     const query = searchQuery.trim();
     if (!query) return;
-    navigate(`/searchv2?q=${encodeURIComponent(query)}`);
+    navigate(searchPath(query));
   };
 
   const formatCompactCoin = (value: number) =>
@@ -375,7 +376,7 @@ export default function DashboardPage() {
               <div className="latest-placeholder">No transactions available yet.</div>
             ) : (
               txs.map((tx) => (
-                <Link to={`/searchv2?q=${encodeURIComponent(tx.txid)}`} key={tx.txid} className="latest-item">
+                <Link to={txPath(tx.txid)} key={tx.txid} className="latest-item">
                   <div className="latest-item-icon tx-icon">
                     <HiOutlineBanknotes />
                   </div>

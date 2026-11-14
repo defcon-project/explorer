@@ -45,6 +45,15 @@ export function statusName(status: string | null | undefined): string {
   return STATUS_NAMES[key] ?? (key || 'Unknown');
 }
 
+/** The badge colour of a status: green when enabled, amber under a PoSe penalty, red when banned. */
+export function statusTone(status: string | null | undefined): 'success' | 'warning' | 'error' | '' {
+  const key = String(status ?? '').trim().toUpperCase();
+  if (key === 'ENABLED') return 'success';
+  if (key === 'POSE_PENALTY') return 'warning';
+  if (key === 'POSE_BANNED') return 'error';
+  return '';
+}
+
 /** What the stored event records, in words; it adds no cause or diagnosis. */
 export function describeEvent(event: MasternodeNodeEventView): string {
   if (event.eventType === 'ban') return event.eventStatus === 'recovered' ? 'PoSe ban, later recovered' : 'PoSe ban';

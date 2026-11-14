@@ -1,4 +1,5 @@
 import type { ActiveMasternodeVersionsView, MasternodesView } from '../../types/api';
+import { serviceText } from './serviceText';
 
 // The full snapshot (`/api/masternodes`) carries proTxHash and the payout address; the paged list does not.
 type MasternodeNode = MasternodesView['nodes'][number];
@@ -60,11 +61,6 @@ function activeStatus(status: string | null | undefined): MasternodeRow['status'
 function ipv4Key(ip: string | null | undefined): number[] | null {
   const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(ip || ''));
   return match ? match.slice(1).map(Number) : null;
-}
-
-function serviceText(node: MasternodeNode): string {
-  if (node.ip) return node.port != null ? `${node.ip}:${node.port}` : node.ip;
-  return node.service || 'Unknown';
 }
 
 /**

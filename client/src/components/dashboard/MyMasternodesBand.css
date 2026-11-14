@@ -1,0 +1,94 @@
+/* "My masternodes" on the home page: the visitor's starred masternodes and their status. */
+
+.my-mn-header {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.my-mn-heading {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.my-mn-summary {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A count stays on one line with its label ("1 Not in the list"); the line breaks between counts. */
+.my-mn-count {
+  white-space: nowrap;
+}
+
+/* Every link and button in the band is at least 40 px tall, to be easy to tap. */
+.my-mn-header .btn {
+  min-height: 40px;
+}
+
+.my-mn-state {
+  min-height: 0;
+  margin-bottom: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+}
+
+.my-mn-state:last-child {
+  margin-bottom: 0;
+}
+
+.my-mn-list {
+  display: grid;
+  /* Wide enough for the longest IPv4 address and port beside the widest badge, so neither is cut. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.my-mn-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  padding: 8px 10px;
+}
+
+.my-mn-item:hover {
+  border-color: var(--accent);
+}
+
+.my-mn-service {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+}
+
+.my-mn-item .badge {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.my-mn-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  margin-top: var(--space-1);
+  font-size: 0.84rem;
+}
+
+.my-mn-note {
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}

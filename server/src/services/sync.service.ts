@@ -64,6 +64,11 @@ class SyncService {
   private currentSync: Promise<void> | null = null;
   // How long stop() waits for the current block before it leaves the lock to startup recovery.
   private stopTimeoutMs = 15_000;
+  // Set by start() until stop(): a second start() (for example after a database reconnect) does nothing.
+  private started = false;
+  // A lock whose holder has shown no heartbeat for this long may be taken over. Each indexed block
+  // and each batch of an address rebuild writes a heartbeat, so this is far above any normal gap.
+  private readonly SYNC_LOCK_EXPIRY_MS = 10 * 60 * 1000;
   private readonly LOG_INTERVAL = 100;
   private readonly REBUILD_LOG_INTERVAL = 10000;
   private readonly ADDRESS_BULK_FLUSH_THRESHOLD = 2000;
@@ -254,6 +259,8 @@ class SyncService {
       if (bulkOps.length === 0) return;
       await Address.bulkWrite(bulkOps, { ordered: false });
       bulkOps.length = 0;
+      // A long rebuild keeps its sync lock from looking abandoned (see acquireSyncLock).
+      await SyncState.updateOne({ key: 'main' }, { heartbeatAt: new Date() });
     };
 
     for await (const tx of cursor) {
@@ -595,21 +602,31 @@ class SyncService {
   }
 
   async start(): Promise<void> {
-    if (this.isRunning) {
+    if (this.started || this.isRunning) {
       logger.warn('Sync service is already running');
       return;
     }
+    this.started = true;
 
     logger.info('Starting blockchain sync service...');
     this.stopRequested = false;
 
-    await this.ensureIndexVersion();
-    await this.ensureSatoshiDataVersion();
-    await this.recoverStartupState();
-    await this.addressResolver.preInferVersionByte();
+    try {
+      await this.ensureIndexVersion();
+      await this.ensureSatoshiDataVersion();
+      await this.recoverStartupState();
+      await this.addressResolver.preInferVersionByte();
 
-    // Run initial sync
-    await this.sync();
+      // Run initial sync
+      await this.sync();
+    } catch (error) {
+      // A failed start can be tried again, for example on the next database reconnect.
+      this.started = false;
+      throw error;
+    }
+
+    // Stopped while starting: no periodic sync.
+    if (this.stopRequested) return;
 
     // Set up periodic sync for new blocks.
     // Guard: skip if previous sync is still running to prevent overlap.
@@ -629,6 +646,7 @@ class SyncService {
       this.intervalId = null;
     }
     this.stopRequested = true;
+    this.started = false;
 
     // A running sync stops between blocks and releases the lock itself. If the block in progress
     // does not finish in time, the lock stays: the next start sees it and rebuilds the address index.
@@ -677,23 +695,46 @@ class SyncService {
     }
   }
 
+  /**
+   * Atomic database lock, so that only one run indexes at a time. It is taken when free, or when
+   * its holder has shown no heartbeat for SYNC_LOCK_EXPIRY_MS (or never did): a run that died
+   * without releasing it, for example because the database error that ended it also stopped its
+   * final write. Taking over an expired lock requests an address rebuild, as startup recovery does
+   * for a lock left behind, since the holder may have stopped in the middle of a block.
+   */
+  private async acquireSyncLock(now: Date): Promise<boolean> {
+    // The state document normally exists already (ensureIndexVersion writes it). Create it if it
+    // does not, without touching an existing one, so the lock updates below need no upsert: an
+    // upsert against a held lock would try to insert a second document with the same key.
+    await SyncState.updateOne({ key: 'main' }, { $setOnInsert: { key: 'main' } }, { upsert: true });
+
+    const lock = { isRunning: true, startedAt: now, heartbeatAt: now, error: null };
+    const free = await SyncState.findOneAndUpdate({ key: 'main', isRunning: { $ne: true } }, lock, { new: true })
+      .select({ _id: 1 })
+      .lean();
+    if (free) return true;
+
+    const expiredBefore = new Date(now.getTime() - this.SYNC_LOCK_EXPIRY_MS);
+    const takenOver = await SyncState.findOneAndUpdate(
+      { key: 'main', isRunning: true, $or: [{ heartbeatAt: { $lt: expiredBefore } }, { heartbeatAt: null }] },
+      { ...lock, addressRebuildRequired: true },
+      { new: true }
+    )
+      .select({ _id: 1 })
+      .lean();
+    if (!takenOver) return false;
+
+    logger.warn(
+      `Took over a sync lock without a heartbeat for ${this.SYNC_LOCK_EXPIRY_MS / 60_000} minutes; ` +
+        'rebuilding the address index first.'
+    );
+    return true;
+  }
+
   private async runSync(): Promise<void> {
     const syncStartedAt = new Date();
 
-    // Atomic DB-level lock: only acquire if not already running.
-    // This prevents race conditions when multiple instances or overlapping calls exist.
-    const lockAcquired = await SyncState.findOneAndUpdate(
-      { key: 'main', isRunning: { $ne: true } },
-      {
-        isRunning: true,
-        startedAt: syncStartedAt,
-        heartbeatAt: syncStartedAt,
-        error: null,
-      },
-      { upsert: true, new: true }
-    );
-
-    if (!lockAcquired || lockAcquired.isRunning !== true) {
+    if (!(await this.acquireSyncLock(syncStartedAt))) {
       logger.debug('Sync lock not acquired — another instance is running');
       return;
     }
@@ -855,16 +896,21 @@ class SyncService {
     } catch (error) {
       logger.error('Sync error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown sync error';
-      await SyncState.findOneAndUpdate(
-        { key: 'main' },
-        {
-          isRunning: false,
-          startedAt: null,
-          heartbeatAt: new Date(),
-          error: errorMessage,
-        },
-        { upsert: true }
-      );
+      try {
+        await SyncState.findOneAndUpdate(
+          { key: 'main' },
+          {
+            isRunning: false,
+            startedAt: null,
+            heartbeatAt: new Date(),
+            error: errorMessage,
+          },
+          { upsert: true }
+        );
+      } catch (stateError) {
+        // Often the same database trouble. The lock stays held until it expires (acquireSyncLock).
+        logger.error('Could not record the sync error or release the sync lock:', stateError);
+      }
       // WebSocket clients are public: broadcast the masked message, not the raw one.
       this.publishSyncStatus('error', daemonHeight, lastKnownSyncedHeight, {
         error: mapPublicSyncError(errorMessage, true).error,

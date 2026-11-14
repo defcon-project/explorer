@@ -6,7 +6,7 @@ import { invalidateDashboardCache } from '../routes/dashboard.routes';
 import { invalidateRichlistCache } from '../routes/richlist.routes';
 import { Block } from '../models/Block';
 import { Transaction } from '../models/Transaction';
-import { Address } from '../models/Address';
+import { Address, AddressRebuild, ADDRESS_REBUILD_COLLECTION } from '../models/Address';
 import { SyncState } from '../models/SyncState';
 import mongoose from 'mongoose';
 import { COIN } from '@defcon/shared';
@@ -262,12 +262,37 @@ class SyncService {
     );
   }
 
+  /** Drops the rebuild collection if it exists (left by an interrupted rebuild, or after a failure). */
+  private async dropAddressRebuildCollection(): Promise<void> {
+    const existing = await mongoose.connection.db!
+      .listCollections({ name: ADDRESS_REBUILD_COLLECTION }, { nameOnly: true })
+      .toArray();
+    if (existing.length > 0) await AddressRebuild.collection.drop();
+  }
+
   // Rebuild address balances from stored transactions.
   // This gives a deterministic recovery path after rollback/restart on MongoDB tiers
   // where multi-collection transactions are unavailable.
+  // The new index is built in a separate collection with the same indexes and renamed over the
+  // live one at the end, so readers keep the complete old data while it runs, and a rebuild that
+  // fails leaves the old data as it was (the caller keeps addressRebuildRequired set).
   private async rebuildAddressIndexFromTransactions(): Promise<void> {
-    await Address.deleteMany({});
+    await this.dropAddressRebuildCollection();
+    await AddressRebuild.createCollection();
+    await AddressRebuild.createIndexes();
+    try {
+      await this.writeAddressIndexInto(AddressRebuild);
+      await AddressRebuild.collection.rename(Address.collection.collectionName, { dropTarget: true });
+    } catch (error) {
+      await this.dropAddressRebuildCollection().catch((dropError) =>
+        logger.error('Could not drop the unfinished address rebuild collection:', dropError)
+      );
+      throw error;
+    }
+  }
 
+  /** Computes every address from the stored transactions into `target`, which starts empty. */
+  private async writeAddressIndexInto(target: typeof AddressRebuild): Promise<void> {
     const cursor = Transaction.find({})
       // Sort by blockheight to guarantee correct chronological order for balance deltas.
       // The compound index { blockheight: -1, _id: -1 } exists; ascending scan is fine.
@@ -289,7 +314,7 @@ class SyncService {
 
     const flushBulk = async () => {
       if (bulkOps.length === 0) return;
-      await Address.bulkWrite(bulkOps, { ordered: false });
+      await target.bulkWrite(bulkOps, { ordered: false });
       bulkOps.length = 0;
       // A long rebuild keeps its sync lock from looking abandoned (see acquireSyncLock).
       await SyncState.updateOne({ key: 'main' }, { heartbeatAt: new Date() });

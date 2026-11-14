@@ -23,6 +23,8 @@ import { usePageVisibility } from '../hooks/usePageVisibility';
 import type { DashboardBlockView, DashboardTxView, TxListItemView, TxView } from '../types/api';
 import { classifyTransaction } from '../components/flow/flowModel';
 import ChartBoundary from '../components/dashboard/ChartBoundary';
+import MyMasternodesBand from '../components/dashboard/MyMasternodesBand';
+import { useFavoriteMasternodes } from '../utils/favoriteMasternodes';
 import { buildFlowChartPoints, formatUtcHour, formatUtcHourSpan, type FlowPointInput } from '../components/dashboard/liveFlowModel';
 import './DashboardPage.css';
 import { txPath } from '../utils/routes';
@@ -311,6 +313,8 @@ function LatestBlockRow({ block, stakeRewardPerBlock, isExpanded, onToggle, pric
 export default function DashboardPage() {
   const [expandedBlockHeight, setExpandedBlockHeight] = useState<number | null>(null);
   const [hideRewards, setHideRewards] = useState(readHideRewards);
+  // The "My masternodes" band, and its request for the masternode list, exist only while something is starred.
+  const { favorites, persistent: favoritesPersistent } = useFavoriteMasternodes();
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: ['dashboard-overview'],
     queryFn: fetchDashboardOverview,
@@ -424,6 +428,8 @@ export default function DashboardPage() {
           />
         </dl>
       </section>
+
+      {favorites.length > 0 && <MyMasternodesBand favorites={favorites} persistent={favoritesPersistent} />}
 
       <section className="grid-2 dashboard-latest">
         <div className="card latest-card">

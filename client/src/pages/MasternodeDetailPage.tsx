@@ -12,7 +12,7 @@ import { formatNumber } from '../utils/formatters';
 import { addressPath, blockPath, isProTxHash, masternodePath } from '../utils/routes';
 import { useFavoriteMasternodes } from '../utils/favoriteMasternodes';
 import { registrationKey } from './masternodes/masternodeRows';
-import { describeEvent, eventsOfRegistration, statusName } from './masternodes/nodeEvents';
+import { describeEvent, eventsOfRegistration, statusName, statusTone } from './masternodes/nodeEvents';
 import './PageStyles.css';
 import './masternodes/masternodeBadges.css';
 import './MasternodeDetailPage.css';
@@ -27,9 +27,7 @@ export default function MasternodeDetailPage() {
 }
 
 function statusBadge(status: string) {
-  const key = status.toUpperCase();
-  const tone = key === 'ENABLED' ? 'success' : key === 'POSE_PENALTY' ? 'warning' : key === 'POSE_BANNED' ? 'error' : '';
-  return <span className={`badge ${tone}`.trim()}>{statusName(status)}</span>;
+  return <span className={`badge ${statusTone(status)}`.trim()}>{statusName(status)}</span>;
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {

@@ -26,19 +26,17 @@
     "ops:restore": "bash scripts/ops/restore.sh",
     "ops:restore-check": "bash scripts/ops/restore-check.sh"
   },
-  "dependencies": {
-    "concurrently": "^8.2.2",
-    "typescript": "^5.4.0"
-  },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.56.0",
+    "concurrently": "^8.2.2",
     "eslint": "^10.0.1",
+    "typescript": "^5.4.0",
     "ws": "^8.21.3"
   },
   "overrides": {
     "minimatch": "^10.2.2",
-    "shell-quote": "1.10.0"
+    "shell-quote": "^1.11.0"
   },
   "repository": {
     "type": "git",

@@ -3,7 +3,7 @@ import { Block } from '../models/Block';
 import { Transaction } from '../models/Transaction';
 import { config } from '../config';
 import { getChainTip } from '../services/chainTip.service';
-import { loadBlockRoles } from '../services/blockRoles.service';
+import { loadBlockRoles, withBlockProducers } from '../services/blockRoles.service';
 import { withCachePolicy } from '../middleware/cachePolicy';
 import { normalizeBlockAmounts, normalizeTransactionAmounts } from '../utils/amounts';
 import {
@@ -103,6 +103,8 @@ const BLOCK_LIST_PROJECTION = {
   minedBy: 1,
   rewardSat: 1,
   size: 1,
+  // The first two transactions name the block's producer (withBlockProducers).
+  txids: { $slice: 2 },
 };
 
 const BLOCK_TX_LIST_PROJECTION = {
@@ -215,12 +217,12 @@ router.get('/', withCachePolicy('short'), async (req: Request, res: Response) =>
           .sort({ height: -1 })
           .limit(limit + 1)
           .select(BLOCK_LIST_PROJECTION)
-          .lean(),
+          .lean<Array<Record<string, unknown> & { height: number; txids?: unknown }>>(),
         getChainTip(),
       ]);
 
       const hasMore = rows.length > limit;
-      const pageRows = hasMore ? rows.slice(0, limit) : rows;
+      const pageRows = await withBlockProducers(hasMore ? rows.slice(0, limit) : rows);
       const bestHeight = tip.height;
       const data = pageRows.map((block) =>
         withBlockConfirmations(normalizeBlockAmounts(block), bestHeight)
@@ -241,7 +243,13 @@ router.get('/', withCachePolicy('short'), async (req: Request, res: Response) =>
     }
 
     const [blocks, total, tip] = await Promise.all([
-      Block.find(filter).sort({ height: -1 }).skip(skip).limit(limit).select(BLOCK_LIST_PROJECTION).lean(),
+      Block.find(filter)
+        .sort({ height: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select(BLOCK_LIST_PROJECTION)
+        .lean<Array<Record<string, unknown> & { height: number; txids?: unknown }>>()
+        .then(withBlockProducers),
       hasTimeFilter ? Block.countDocuments(filter) : getTotalBlockCount(),
       getChainTip(),
     ]);
@@ -289,7 +297,12 @@ router.get('/latest', withCachePolicy('short'), async (req: Request, res: Respon
 
     const fetchPromise = (async () => {
       const [blocks, tip] = await Promise.all([
-        Block.find().sort({ height: -1 }).limit(count).select(BLOCK_LIST_PROJECTION).lean(),
+        Block.find()
+          .sort({ height: -1 })
+          .limit(count)
+          .select(BLOCK_LIST_PROJECTION)
+          .lean<Array<Record<string, unknown> & { height: number; txids?: unknown }>>()
+          .then(withBlockProducers),
         getChainTip(),
       ]);
       const bestHeight = tip.height;

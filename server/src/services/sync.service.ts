@@ -31,6 +31,7 @@ import {
   collectInvolvedAddresses,
   mergeAddressDeltas,
   normalizeSat,
+  type AddressDelta,
 } from './sync/addressIndexing';
 import { runScheduledSyncAttempt } from './sync/syncScheduling';
 
@@ -77,6 +78,9 @@ class SyncService {
   private readonly CURSOR_MAX_TIME_MS = Math.max(30_000, config.rpc.timeout);
   private readonly ADDRESS_INDEX_VERSION = 3;
   private readonly SATOSHI_DATA_VERSION = 3;
+  // 1: txCount counts each transaction an address takes part in (it counted blocks during live
+  // sync and transactions in a rebuild). An older stored version rebuilds the address index once.
+  private readonly ADDRESS_STATS_VERSION = 1;
   private readonly SAT_MULTIPLIER = 10 ** COIN.DECIMALS;
   private readonly TX_EVENT_MAX_PER_BLOCK = 250;
 
@@ -158,7 +162,8 @@ class SyncService {
     return before?.addressRebuildRequired === true;
   }
 
-  private async recoverStartupState(): Promise<void> {
+  /** Repairs what a previous run left behind; returns true when it rebuilt the address index. */
+  private async recoverStartupState(): Promise<boolean> {
     const syncState = await SyncState.findOne({ key: 'main' }).lean();
     const indexedTip = await Block.findOne({})
       .sort({ height: -1 })
@@ -179,7 +184,7 @@ class SyncService {
         },
         { upsert: true }
       );
-      return;
+      return false;
     }
 
     // If sync state points past our indexed tip (possible after crash during rollback),
@@ -214,7 +219,7 @@ class SyncService {
       );
     }
 
-    if (!recoveryPlan.rebuildAddressIndex) return;
+    if (!recoveryPlan.rebuildAddressIndex) return false;
 
     logger.warn('Detected pending address index rebuild flag. Rebuilding from transactions...');
     await this.rebuildAddressIndexFromTransactions();
@@ -228,6 +233,33 @@ class SyncService {
       { upsert: true }
     );
     logger.info('Pending address rebuild recovered successfully.');
+    return true;
+  }
+
+  /**
+   * Brings the stored address statistics to ADDRESS_STATS_VERSION: if the stored version is older,
+   * rebuilds the address index once and records the version. A rebuild that startup recovery has
+   * just done counts, so a start never rebuilds twice. Interrupted before the version is written,
+   * the next start simply rebuilds again.
+   */
+  private async ensureAddressStatsVersion(rebuiltThisStart: boolean): Promise<void> {
+    const syncState = await SyncState.findOne({ key: 'main' }).select({ addressStatsVersion: 1 }).lean<{ addressStatsVersion?: number }>();
+    const currentVersion = syncState?.addressStatsVersion ?? 0;
+    if (currentVersion >= this.ADDRESS_STATS_VERSION) return;
+
+    if (!rebuiltThisStart) {
+      logger.warn(
+        `Address statistics version ${currentVersion} -> ${this.ADDRESS_STATS_VERSION}: rebuilding the address index once...`
+      );
+      const startedAt = Date.now();
+      await this.rebuildAddressIndexFromTransactions();
+      logger.info(`Address statistics rebuild finished in ${Math.round((Date.now() - startedAt) / 1000)} s.`);
+    }
+    await SyncState.findOneAndUpdate(
+      { key: 'main' },
+      { addressStatsVersion: this.ADDRESS_STATS_VERSION, heartbeatAt: new Date() },
+      { upsert: true }
+    );
   }
 
   // Rebuild address balances from stored transactions.
@@ -269,28 +301,8 @@ class SyncService {
         continue;
       }
 
-      const addressMap = new Map<string, { receivedSat: bigint; sentSat: bigint }>();
-
-      for (const vout of tx.vout || []) {
-        const addresses = vout.scriptPubKey?.addresses;
-        if (!addresses?.length) continue;
-        const valueSat = normalizeSat(vout.valueSat);
-        for (const addr of addresses) {
-          const entry = addressMap.get(addr) || { receivedSat: 0n, sentSat: 0n };
-          entry.receivedSat += valueSat;
-          addressMap.set(addr, entry);
-        }
-      }
-
-      if (!tx.isCoinbase) {
-        for (const vin of tx.vin || []) {
-          const valueSat = normalizeSat(vin.valueSat);
-          if (!vin.address || valueSat <= 0n) continue;
-          const entry = addressMap.get(vin.address) || { receivedSat: 0n, sentSat: 0n };
-          entry.sentSat += valueSat;
-          addressMap.set(vin.address, entry);
-        }
-      }
+      // The same per-transaction changes live sync collects (processTransaction).
+      const addressMap = collectAddressDeltas(tx.vin || [], tx.vout || [], !!tx.isCoinbase);
 
       for (const [addr, update] of addressMap) {
         bulkOps.push({
@@ -614,7 +626,8 @@ class SyncService {
     try {
       await this.ensureIndexVersion();
       await this.ensureSatoshiDataVersion();
-      await this.recoverStartupState();
+      const rebuiltThisStart = await this.recoverStartupState();
+      await this.ensureAddressStatsVersion(rebuiltThisStart);
       await this.addressResolver.preInferVersionByte();
 
       // Run initial sync
@@ -982,7 +995,7 @@ class SyncService {
     let totalValueOutSat = 0n;
     let minedBy: string | undefined;
     const txids: string[] = [];
-    const blockAddressDeltas = new Map<string, { receivedSat: bigint; sentSat: bigint }>();
+    const blockAddressDeltas = new Map<string, AddressDelta>();
 
     const txEntries = (rpcBlock.tx || []) as Array<string | RpcTransaction>;
 
@@ -1115,7 +1128,7 @@ class SyncService {
   ): Promise<{
     totalValueOutSat: bigint;
     isCoinbase: boolean;
-    addressDeltas?: Map<string, { receivedSat: bigint; sentSat: bigint }>;
+    addressDeltas?: Map<string, AddressDelta>;
   }> {
     const isCoinbase = rpcTx.vin.length > 0 && !!rpcTx.vin[0].coinbase;
 
@@ -1369,7 +1382,7 @@ class SyncService {
   // ── Address Balance Updates ─────────────────────────────────────
 
   private async applyAddressDeltas(
-    addressMap: Map<string, { receivedSat: bigint; sentSat: bigint }>,
+    addressMap: Map<string, AddressDelta>,
     blocktime: number
   ): Promise<boolean> {
     if (addressMap.size === 0) return false;
@@ -1455,6 +1468,7 @@ class SyncService {
         error: null,
         addressIndexVersion: this.ADDRESS_INDEX_VERSION,
         satoshiDataVersion: this.SATOSHI_DATA_VERSION,
+        addressStatsVersion: this.ADDRESS_STATS_VERSION,
       },
       { upsert: true }
     );

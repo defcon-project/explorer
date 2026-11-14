@@ -151,7 +151,7 @@
 
 .flow-card {
   content-visibility: auto;
-  contain-intrinsic-size: 320px;
+  contain-intrinsic-size: auto 440px;
 }
 
 .flow-kpis {
@@ -184,42 +184,66 @@
   font-variant-numeric: tabular-nums;
 }
 
-.flow-bars {
+.flow-chart {
   margin-top: 12px;
-  height: 148px;
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  background: var(--surface-muted);
-  display: grid;
-  grid-template-columns: repeat(24, minmax(0, 1fr));
-  align-items: end;
-  gap: 4px;
-  padding: 10px;
+  height: 200px;
+  min-width: 0;
 }
 
-.flow-bar-item {
-  position: relative;
-  height: 100%;
+.flow-chart-loading {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  gap: 2px;
+  border: 1px dashed var(--border-soft);
+  border-radius: 12px;
+  color: var(--text-subtle);
+  font-size: 0.8rem;
 }
 
-.flow-bar {
-  width: 42%;
-  border-radius: 6px 6px 3px 3px;
-  min-height: 0;
+.flow-tooltip {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+  box-shadow: var(--card-shadow);
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
 }
 
-.flow-bar-blocks {
-  background: var(--accent);
-  opacity: 0.9;
+.flow-tooltip-title {
+  margin-bottom: 4px;
+  color: var(--text);
+  font-weight: 600;
 }
 
-.flow-bar-txs {
-  background: var(--success);
-  opacity: 0.88;
+.flow-tooltip-note {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.flow-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-tooltip-row strong {
+  color: var(--text);
+}
+
+.flow-key {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.flow-key-blocks {
+  background: var(--chart-series-1);
+}
+
+.flow-key-txs {
+  background: var(--chart-series-2);
 }
 
 .flow-legend {
@@ -239,18 +263,58 @@
   gap: 6px;
 }
 
-.flow-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
+.flow-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
 }
 
-.flow-dot-blocks {
-  background: var(--accent);
+.flow-swatch-blocks {
+  background: var(--chart-series-1);
 }
 
-.flow-dot-txs {
-  background: var(--success);
+.flow-swatch-txs {
+  background: var(--chart-series-2);
+}
+
+/* The lighter bars of the hour that is still counting: both series at the chart's opacity. */
+.flow-swatch-current {
+  background: linear-gradient(90deg, var(--chart-series-1) 50%, var(--chart-series-2) 50%);
+  opacity: 0.6;
+}
+
+.flow-table {
+  margin-top: 6px;
+}
+
+.flow-table summary {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.flow-table th,
+.flow-table td {
+  padding: 8px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The hour heads its row but reads like the other cells; "(in progress)" may wrap on a phone. */
+.flow-table tbody th {
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text);
+  font-size: inherit;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: normal;
+}
+
+.flow-table tbody tr:last-child th {
+  border-bottom: none;
 }
 
 .dashboard-latest {
@@ -609,6 +673,11 @@
 
   .flow-kpis {
     grid-template-columns: 1fr;
+  }
+
+  /* The stacked tiles make the card taller; "auto" keeps the last rendered height once seen. */
+  .flow-card {
+    contain-intrinsic-size: auto 640px;
   }
 
   /* The amount stays visible on a phone, in a narrower column. */

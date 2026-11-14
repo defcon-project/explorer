@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -22,6 +22,8 @@ import { useMarketSnapshot } from '../hooks/useMarketSnapshot';
 import { usePageVisibility } from '../hooks/usePageVisibility';
 import type { DashboardBlockView, DashboardTxView, TxListItemView, TxView } from '../types/api';
 import { classifyTransaction } from '../components/flow/flowModel';
+import ChartBoundary from '../components/dashboard/ChartBoundary';
+import { buildFlowChartPoints, formatUtcHour, formatUtcHourSpan, type FlowPointInput } from '../components/dashboard/liveFlowModel';
 import './DashboardPage.css';
 import { txPath } from '../utils/routes';
 import { computeMasternodeEconomics } from '../utils/masternodeEconomics';
@@ -30,6 +32,10 @@ const REWARD_TOLERANCE = 0.0000001;
 const PROTOCOL_TX_TOLERANCE = 0.0000001;
 const EMPTY_BLOCKS: DashboardBlockView[] = [];
 const EMPTY_TXS: DashboardTxView[] = [];
+const EMPTY_FLOW: FlowPointInput[] = [];
+
+// Recharts loads only with this chart, after the rest of the page.
+const LiveFlowChart = lazy(() => import('../components/dashboard/LiveFlowChart'));
 // The visitor's "Hide rewards" choice, kept in this browser only.
 const HIDE_REWARDS_KEY = 'deftrack.hideRewards';
 
@@ -104,11 +110,14 @@ function rewardRoleLabel(role: RewardRole): string {
   return 'Transfer';
 }
 
-/** The server buckets flow by UTC hour, so the hour is shown in UTC too, not in the browser's time zone. */
-function formatFlowHour(hourIso: string): string {
-  const d = new Date(hourIso);
-  if (Number.isNaN(d.getTime())) return hourIso.slice(11, 16);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:00`;
+/** The current time, refreshed every minute, so time-dependent labels move on without new data. */
+function useMinuteClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return now;
 }
 
 function formatMarketAge(ageSeconds: number | null | undefined): string | null {
@@ -340,22 +349,13 @@ export default function DashboardPage() {
   const totalValueTransferred24h =
     typeof stats?.totalValueTransferred24h === 'number' ? stats.totalValueTransferred24h : null;
   const txCount24h = typeof stats?.txCount24h === 'number' ? stats.txCount24h : null;
-  const flow24h = stats?.flow24h ?? [];
+  const flow24h = stats?.flow24h ?? EMPTY_FLOW;
   const flow24hBlocks = flow24h.reduce((sum, point) => sum + point.blocks, 0);
   const avgTxPerBlock24h = flow24hBlocks > 0 && txCount24h != null ? txCount24h / flow24hBlocks : null;
-  const flowBars = useMemo(() => {
-    const peakBlocks = Math.max(1, ...flow24h.map((point) => point.blocks));
-    const peakTxs = Math.max(1, ...flow24h.map((point) => point.txs));
-    return flow24h.map((point) => {
-      const blocksPct = point.blocks > 0 ? Math.max(8, Math.round((point.blocks / peakBlocks) * 100)) : 0;
-      const txsPct = point.txs > 0 ? Math.max(6, Math.round((point.txs / peakTxs) * 100)) : 0;
-      return {
-        ...point,
-        blocksPct,
-        txsPct,
-      };
-    });
-  }, [flow24h]);
+  // The newest hour counts as still filling up until it ends; checked again every minute.
+  const nowMs = useMinuteClock();
+  const flowPoints = useMemo(() => buildFlowChartPoints(flow24h, nowMs), [flow24h, nowMs]);
+  const currentFlowHour = flowPoints.find((point) => point.inProgress) ?? null;
   const stakeRewardPerBlock =
     typeof stats?.stakingReward === 'number' && stats.stakingReward > 0 ? stats.stakingReward : null;
 
@@ -569,27 +569,51 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {flowBars.length > 0 ? (
+        {flowPoints.length > 0 ? (
           <>
-            <div className="flow-bars" aria-label="Hourly flow chart">
-              {flowBars.map((point) => (
-                <div
-                  key={point.hour}
-                  className="flow-bar-item"
-                  title={`${formatFlowHour(point.hour)} UTC | ${point.blocks} blocks | ${point.txs} txs`}
-                >
-                  <span className="flow-bar flow-bar-blocks" style={{ height: `${point.blocksPct}%` }} />
-                  <span className="flow-bar flow-bar-txs" style={{ height: `${point.txsPct}%` }} />
-                </div>
-              ))}
-            </div>
+            <ChartBoundary>
+              <Suspense fallback={<div className="flow-chart flow-chart-loading" role="status">Loading chart...</div>}>
+                <LiveFlowChart points={flowPoints} />
+              </Suspense>
+            </ChartBoundary>
             <div className="flow-legend">
-              <span><i className="flow-dot flow-dot-blocks" /> Blocks/hour</span>
-              <span><i className="flow-dot flow-dot-txs" /> Txs/hour</span>
+              <span><i className="flow-swatch flow-swatch-blocks" /> Blocks per hour</span>
+              <span><i className="flow-swatch flow-swatch-txs" /> Transactions per hour</span>
+              {currentFlowHour ? (
+                <span className="flow-legend-current">
+                  <i className="flow-swatch flow-swatch-current" /> {formatUtcHour(currentFlowHour.startMs)} UTC still counting
+                </span>
+              ) : null}
               <span>
-                {formatFlowHour(flowBars[0].hour)} - {formatFlowHour(flowBars[flowBars.length - 1].hour)} UTC
+                {formatUtcHour(flowPoints[0].startMs)} - {formatUtcHour(flowPoints[flowPoints.length - 1].startMs)} UTC
               </span>
             </div>
+            <details className="flow-table">
+              <summary>Hourly numbers</summary>
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Hour (UTC)</th>
+                      <th scope="col">Blocks</th>
+                      <th scope="col">Transactions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {flowPoints.map((point) => (
+                      <tr key={point.hour}>
+                        <th scope="row">
+                          {formatUtcHourSpan(point.startMs)}
+                          {point.inProgress ? <span className="text-muted"> (in progress)</span> : null}
+                        </th>
+                        <td>{point.blocks == null ? 'n/a' : formatNumber(point.blocks)}</td>
+                        <td>{point.txs == null ? 'n/a' : formatNumber(point.txs)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
           </>
         ) : (
           <div className="latest-placeholder">Waiting for 24h flow data...</div>

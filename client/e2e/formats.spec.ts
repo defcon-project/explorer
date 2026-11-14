@@ -102,6 +102,11 @@ test('the dashboard hourly flow chart names its hours in UTC @smoke', async ({ p
   const legend = page.locator('.flow-legend');
   await expect(legend).toContainText('13:00 - 12:00 UTC');
   await expect(legend).not.toContainText(/15:00|14:00/);
-  await expect(page.locator('.flow-bar-item')).toHaveCount(24);
-  await expect(page.locator('.flow-bar-item').last()).toHaveAttribute('title', /^12:00 UTC \| 24 blocks \| 23 txs$/);
+  const ticks = page.locator('.flow-chart .recharts-xAxis .recharts-cartesian-axis-tick-value');
+  await expect(ticks.last()).toHaveText('12:00');
+  await page.locator('.flow-table summary').click();
+  const rows = page.locator('.flow-table tbody tr');
+  await expect(rows).toHaveCount(24);
+  await expect(rows.last().locator('th')).toHaveText('12:00–13:00');
+  await expect(rows.last().locator('td')).toHaveText(['24', '23']);
 });

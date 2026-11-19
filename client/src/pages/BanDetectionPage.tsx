@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { OperatorDiagnosisPanel, nodePermalink } from '../components/OperatorDiagnosisPanel';
 import { BannedByPanel } from '../components/BannedByPanel';
+import Pager from '../components/ui/Pager';
 import TimeText from '../components/ui/TimeText';
+import { useSiteHeaderHeight } from '../hooks/useSiteHeaderHeight';
 import { isProTxHash, masternodePath } from '../utils/routes';
 import {
   HiOutlineFire,
@@ -47,12 +49,23 @@ const WINDOW_OPTIONS: { key: WindowKey; label: string; hours: number }[] = [
   { key: '90d', label: '90 days', hours: 2160 },
 ];
 
+/** The page stays one long page; this menu jumps to its parts. */
+const PAGE_SECTIONS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'nodes', label: 'Nodes' },
+  { id: 'diagnosis', label: 'Diagnosis' },
+  { id: 'waves', label: 'Waves' },
+] as const;
+
+/** Height of the sticky section menu, in pixels; the CSS reads it from `--bd-nav-h`. */
+const SECTION_NAV_HEIGHT = 48;
+const NODE_PAGE_SIZE = 25;
 
 const SEVERITY_COLOR: Record<BanWaveDetail['severity'], string> = {
-  low: '#888',
-  moderate: '#f5a623',
-  high: '#ef4d56',
-  critical: '#9b1b22',
+  low: 'var(--text-subtle)',
+  moderate: 'var(--severity-medium)',
+  high: 'var(--severity-high)',
+  critical: 'var(--severity-critical)',
 };
 
 const SEVERITY_RANK: Record<BanWaveDetail['severity'], number> = {
@@ -127,6 +140,8 @@ export function BanDetectionPage() {
   const [repeatsOnly, setRepeatsOnly] = useState(false);
   const isPageVisible = usePageVisibility();
   const chartAnimation = useChartAnimation();
+  const headerHeight = useSiteHeaderHeight();
+  const nodePanelRef = useRef<HTMLElement>(null);
 
   const win = WINDOW_OPTIONS.find((w) => w.key === windowKey) ?? WINDOW_OPTIONS[1];
 
@@ -142,6 +157,26 @@ export function BanDetectionPage() {
     `${node.nodeId} ${node.proTxHash ?? ''} ${node.service}`.toLowerCase().includes(nodeFilter.toLowerCase()));
   const periodLabel = windowKey === 'q60' ? 'Since Q60 activation' : `Selected period: ${win.label}`;
   const eventCount = trackedNodes.reduce((sum, node) => sum + node.banCount, 0);
+
+  // A new period, search or filter starts the node table again on its first page. A refresh of the
+  // same list keeps the page.
+  const nodeListKey = `${windowKey}|${repeatsOnly}|${nodeFilter.toLowerCase()}`;
+  const [nodeListKeySeen, setNodeListKeySeen] = useState(nodeListKey);
+  const [nodePageChosen, setNodePageChosen] = useState(1);
+  if (nodeListKeySeen !== nodeListKey) {
+    setNodeListKeySeen(nodeListKey);
+    setNodePageChosen(1);
+  }
+  const nodePages = Math.max(1, Math.ceil(visibleNodes.length / NODE_PAGE_SIZE));
+  const nodePage = Math.min(nodeListKeySeen === nodeListKey ? nodePageChosen : 1, nodePages);
+  const pagedNodes = visibleNodes.slice((nodePage - 1) * NODE_PAGE_SIZE, nodePage * NODE_PAGE_SIZE);
+  const onNodePage = (page: number) => {
+    setNodePageChosen(page);
+    // From the pager under the table, bring the table's top back into view below the sticky bars.
+    const panel = nodePanelRef.current;
+    if (panel && panel.getBoundingClientRect().top < headerHeight + SECTION_NAV_HEIGHT) panel.scrollIntoView({ block: 'start' });
+  };
+  const stickyStyle = { '--bd-header-h': `${headerHeight}px`, '--bd-nav-h': `${SECTION_NAV_HEIGHT}px` } as CSSProperties;
 
   const timelineChartData = useMemo(() => {
     if (!data) return [];
@@ -244,7 +279,7 @@ export function BanDetectionPage() {
     point.timestamp * 1000 <= activationMs && point.timestamp * 1000 + bucketDurationMs > activationMs)?.bucket;
 
   return (
-    <div className="page-container bd-page">
+    <div className="page-container bd-page" style={stickyStyle}>
       <section className="bd-hero-card">
         <header className="bd-hero-header">
           <div className="bd-hero-copy">
@@ -310,8 +345,12 @@ export function BanDetectionPage() {
         </p>}
       </section>
 
+      <nav className="bd-section-nav" aria-label="Page sections">
+        {PAGE_SECTIONS.map((section) => <a key={section.id} href={`#${section.id}`}>{section.label}</a>)}
+      </nav>
+
       {/* KPI strip */}
-      <h2 className="mnh-panel-title bd-section-title">Current registered masternodes</h2>
+      <h2 id="overview" className="mnh-panel-title bd-section-title bd-section">Current registered masternodes</h2>
       <section className="mnh-stats-grid bd-current-stats">
         <KPI icon={<HiOutlineGlobeAlt />} label="Registered" value={data?.rpcAvailable && data.dataStatus !== 'stale' ? formatNumber(data.registeredTotal) : 'Unknown'} sub="Current daemon snapshot" />
         <KPI icon={<HiOutlineBolt />} label="Active" value={data?.rpcAvailable && data.dataStatus !== 'stale' ? formatNumber(data.currentValid) : 'Unknown'} sub="ENABLED + POSE_PENALTY" />
@@ -462,8 +501,8 @@ export function BanDetectionPage() {
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 {activationBucket && <ReferenceLine
-                  yAxisId="left" x={activationBucket} stroke="#2f8fff" strokeDasharray="4 4"
-                  label={{ value: 'Q60 · 144888', position: 'insideTopLeft', fill: '#2f8fff', fontSize: 11 }}
+                  yAxisId="left" x={activationBucket} stroke="var(--accent)" strokeDasharray="4 4"
+                  label={{ value: 'Q60 · 144888', position: 'insideTopLeft', fill: 'var(--accent)', fontSize: 11 }}
                 />}
                 {waveBands.map((band, idx) => (
                   <ReferenceArea
@@ -488,7 +527,7 @@ export function BanDetectionPage() {
                   <Bar
                     yAxisId="left"
                     dataKey="stillBanned"
-                    fill="#ef4d56"
+                    fill="var(--danger)"
                     name="Still banned drop events"
                     maxBarSize={22}
                     {...chartAnimation}
@@ -499,7 +538,7 @@ export function BanDetectionPage() {
                       yAxisId="left"
                       dataKey="isolatedBans"
                       stackId="bans"
-                      fill="#888"
+                      fill="var(--text-subtle)"
                       name="Isolated drop events"
                       maxBarSize={22}
                       {...chartAnimation}
@@ -508,7 +547,7 @@ export function BanDetectionPage() {
                       yAxisId="left"
                       dataKey="waveBans"
                       stackId="bans"
-                      fill="#ef4d56"
+                      fill="var(--danger)"
                       name="Wave drop events"
                       maxBarSize={22}
                       {...chartAnimation}
@@ -529,7 +568,7 @@ export function BanDetectionPage() {
                   yAxisId="right"
                   type="monotone"
                   dataKey="cumulative"
-                  stroke="#2f8fff"
+                  stroke="var(--chart-line)"
                   strokeWidth={2}
                   dot={false}
                   name={timelineMode === 'recovered' ? 'Cumulative recovery events' : 'Cumulative drop events'}
@@ -541,7 +580,7 @@ export function BanDetectionPage() {
         </div>
       </section>
 
-      <section className="mnh-panel bd-node-panel">
+      <section id="nodes" ref={nodePanelRef} className="mnh-panel bd-node-panel bd-section">
         <div className="mnh-panel-header">
           <h2 className="mnh-panel-title">{repeatsOnly ? 'Repeatedly banned nodes' : 'All affected nodes'}</h2>
           <span className="mnh-panel-sub">{periodLabel} · Most repeats first</span>
@@ -554,7 +593,7 @@ export function BanDetectionPage() {
         <div className="mnh-table-wrap">
           <table className="mnh-table">
             <thead><tr><th>Node / Service</th><th>Ban events</th><th>Last ban block</th><th>Last event</th><th>Recorded recovery</th><th>Current state</th><th>Penalty</th><th>Ban cause</th></tr></thead>
-            <tbody>{visibleNodes.map((node) => <tr key={node.proTxHash || node.nodeId}>
+            <tbody>{pagedNodes.map((node) => <tr key={node.proTxHash || node.nodeId}>
               <td className="mnh-mono"><Link to={nodePermalink(node.proTxHash || node.service || node.nodeId)}>{node.service || 'Unknown service'}</Link>{isProTxHash(node.proTxHash)
                 ? <div className="mnh-meta-line"><Link to={masternodePath(node.proTxHash)} title={`Open the masternode page: ${node.proTxHash}`}>{truncateHash(node.proTxHash, 8)}</Link></div>
                 : <div title={node.proTxHash || node.nodeId} className="mnh-meta-line">{truncateHash(node.proTxHash || node.nodeId, 8)}</div>}</td>
@@ -571,14 +610,17 @@ export function BanDetectionPage() {
             </tr>)}</tbody>
           </table>
         </div>
+        <Pager page={nodePage} pages={nodePages} onPage={onNodePage} label="Affected node pages" />
         {visibleNodes.length === 0 && <div className="mnh-empty">{isLoading ? 'Loading…' : !data ? 'Node history unavailable.' : repeatsOnly ? 'No repeated bans match this period and search. Uncheck “Repeated bans only” to view isolated events.' : 'No confirmed bans match this period and search.'}</div>}
       </section>
 
-      <OperatorDiagnosisPanel filter={nodeFilter} paused={paused || !isPageVisible} />
-      <BannedByPanel identity={nodeFilter} height={searchParams.get('ban') ?? ''} paused={paused || !isPageVisible} />
+      <div id="diagnosis" className="bd-section">
+        <OperatorDiagnosisPanel filter={nodeFilter} paused={paused || !isPageVisible} />
+        <BannedByPanel identity={nodeFilter} height={searchParams.get('ban') ?? ''} paused={paused || !isPageVisible} />
+      </div>
 
       {/* Wave list */}
-      <section className="mnh-panel">
+      <section id="waves" className="mnh-panel bd-section">
         <div className="mnh-panel-header">
           <h2 className="mnh-panel-title">
             <HiOutlineFire /> Detected Waves ({data?.waves.length ?? 0})

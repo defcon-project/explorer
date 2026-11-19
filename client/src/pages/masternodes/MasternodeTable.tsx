@@ -7,6 +7,7 @@ import Pager from '../../components/ui/Pager';
 import SearchField from '../../components/ui/SearchField';
 import SortHeader from '../../components/ui/SortHeader';
 import StatePanel from '../../components/ui/StatePanel';
+import { useSiteHeaderHeight } from '../../hooks/useSiteHeaderHeight';
 import { formatNumber, truncateHash } from '../../utils/formatters';
 import { addressPath, masternodePath } from '../../utils/routes';
 import { useFavoriteMasternodes } from '../../utils/favoriteMasternodes';
@@ -52,25 +53,6 @@ const COLUMNS: Array<{ key: SortKey; label: string }> = [
   { key: 'provider', label: 'Provider' },
   { key: 'payout', label: 'Payout' },
 ];
-
-/** Height of the sticky site header, so the table header can stick just below it. */
-function useSiteHeaderHeight(): number {
-  const [height, setHeight] = useState(0);
-  useEffect(() => {
-    const header = document.querySelector('header.header');
-    if (!header) return undefined;
-    const update = () => setHeight(Math.round(header.getBoundingClientRect().height));
-    update();
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
-    observer?.observe(header);
-    window.addEventListener('resize', update);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', update);
-    };
-  }, []);
-  return height;
-}
 
 const SEARCH_DELAY_MS = 300;
 

@@ -24,8 +24,8 @@
   border: 1px solid var(--border-color);
   border-radius: 14px;
   background:
-    radial-gradient(circle at 0% 0%, rgba(47, 143, 255, 0.22), transparent 38%),
-    radial-gradient(circle at 100% 100%, rgba(37, 194, 129, 0.14), transparent 44%),
+    radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 38%),
+    radial-gradient(circle at 100% 100%, color-mix(in oklab, var(--success) 14%, transparent), transparent 44%),
     var(--bg-card);
   box-shadow: var(--shadow-sm);
 }
@@ -37,7 +37,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, rgba(90, 167, 255, 0.92), rgba(37, 194, 129, 0.72));
+  background: linear-gradient(90deg, color-mix(in oklab, var(--accent-hover) 92%, transparent), color-mix(in oklab, var(--success) 72%, transparent));
 }
 
 .bd-hero-header {
@@ -56,8 +56,8 @@
 .bd-hero-kicker {
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(90, 167, 255, 0.38);
-  background: rgba(90, 167, 255, 0.12);
+  border: 1px solid color-mix(in oklab, var(--accent-hover) 38%, transparent);
+  background: color-mix(in oklab, var(--accent-hover) 12%, transparent);
   border-radius: 999px;
   padding: 0.16rem 0.54rem;
   font-size: 0.64rem;
@@ -86,7 +86,7 @@
   padding: 0.42rem;
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  background: linear-gradient(145deg, rgba(47, 143, 255, 0.1), rgba(47, 143, 255, 0) 58%), var(--bg-secondary);
+  background: linear-gradient(145deg, color-mix(in oklab, var(--accent) 10%, transparent), transparent 58%), var(--bg-secondary);
 }
 
 .bd-header-actions {
@@ -129,10 +129,10 @@
 }
 
 .bd-chip-btn.active {
-  border-color: rgba(90, 167, 255, 0.62);
+  border-color: color-mix(in oklab, var(--accent-hover) 62%, transparent);
   color: var(--text-primary);
-  background: linear-gradient(120deg, rgba(47, 143, 255, 0.26), rgba(37, 194, 129, 0.14));
-  box-shadow: 0 0 0 1px rgba(90, 167, 255, 0.24) inset;
+  background: linear-gradient(120deg, color-mix(in oklab, var(--accent) 26%, transparent), color-mix(in oklab, var(--success) 14%, transparent));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent-hover) 24%, transparent) inset;
 }
 
 .bd-icon-btn {
@@ -176,8 +176,8 @@
   border: 1px solid var(--border-color);
   border-radius: 14px;
   background:
-    radial-gradient(circle at 6% -18%, rgba(47, 143, 255, 0.22), transparent 42%),
-    radial-gradient(circle at 96% 120%, rgba(37, 194, 129, 0.14), transparent 45%),
+    radial-gradient(circle at 6% -18%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 42%),
+    radial-gradient(circle at 96% 120%, color-mix(in oklab, var(--success) 14%, transparent), transparent 45%),
     var(--bg-card);
 }
 
@@ -188,8 +188,8 @@
 .bd-control-kicker {
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(90, 167, 255, 0.34);
-  background: rgba(90, 167, 255, 0.12);
+  border: 1px solid color-mix(in oklab, var(--accent-hover) 34%, transparent);
+  background: color-mix(in oklab, var(--accent-hover) 12%, transparent);
   border-radius: 999px;
   padding: 0.16rem 0.56rem;
   font-size: 0.66rem;
@@ -222,7 +222,7 @@
   padding: 0.75rem 0.82rem;
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  background: linear-gradient(150deg, rgba(47, 143, 255, 0.08), rgba(47, 143, 255, 0) 52%), var(--bg-secondary);
+  background: linear-gradient(150deg, color-mix(in oklab, var(--accent) 8%, transparent), transparent 52%), var(--bg-secondary);
   display: flex;
   flex-direction: column;
   gap: 0.42rem;
@@ -247,7 +247,7 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 0.75rem 0.82rem;
-  background: linear-gradient(145deg, rgba(37, 194, 129, 0.11), rgba(37, 194, 129, 0) 58%), var(--bg-secondary);
+  background: linear-gradient(145deg, color-mix(in oklab, var(--success) 11%, transparent), transparent 58%), var(--bg-secondary);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -337,7 +337,7 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background:
-    linear-gradient(165deg, rgba(47, 143, 255, 0.09) 0%, rgba(47, 143, 255, 0) 58%),
+    linear-gradient(165deg, color-mix(in oklab, var(--accent) 9%, transparent) 0%, transparent 58%),
     var(--bg-card);
   overflow: hidden;
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
@@ -350,7 +350,7 @@
   right: 0;
   top: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent-primary), rgba(47, 143, 255, 0.25));
+  background: linear-gradient(90deg, var(--accent-primary), color-mix(in oklab, var(--accent) 25%, transparent));
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -371,7 +371,7 @@
   height: 32px;
   border-radius: 10px;
   border: 1px solid var(--border-color);
-  background: rgba(47, 143, 255, 0.1);
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
   color: var(--accent-primary);
   display: inline-flex;
   align-items: center;
@@ -465,10 +465,10 @@
   border-radius: 6px;
   flex-shrink: 0;
 }
-.bd-sev-low      { background: rgba(127,127,127,0.15); color: var(--text-color-muted); }
+.bd-sev-low      { background: color-mix(in oklab, var(--text-subtle) 15%, transparent); color: var(--text-color-muted); }
 .bd-sev-moderate { background: rgba(var(--warning-rgb), 0.18); color: var(--severity-medium); }
 .bd-sev-high     { background: rgba(var(--error-rgb), 0.18);   color: var(--severity-high); }
-.bd-sev-critical { background: var(--severity-critical); color: #fff; }
+.bd-sev-critical { background: var(--severity-critical); color: var(--text-inverse); }
 
 /* Wave card */
 .bd-wave-card {
@@ -476,7 +476,7 @@
   border-radius: 10px;
   margin-bottom: 0.7rem;
   overflow: hidden;
-  background: rgba(127,127,127,0.03);
+  background: color-mix(in oklab, var(--text-subtle) 3%, transparent);
 }
 
 .bd-wave-head {
@@ -494,7 +494,7 @@
   font-family: inherit;
 }
 .bd-wave-head:hover {
-  background: rgba(127,127,127,0.06);
+  background: color-mix(in oklab, var(--text-subtle) 6%, transparent);
 }
 
 .bd-wave-title {
@@ -539,7 +539,7 @@
 .bd-country-tag {
   font-size: 0.7rem;
   font-weight: 600;
-  background: rgba(127,127,127,0.1);
+  background: color-mix(in oklab, var(--text-subtle) 10%, transparent);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 0.15rem 0.5rem;
@@ -664,13 +664,13 @@
 .bd-status-banned,
 .bd-status-still_banned {
   color: var(--danger);
-  border-color: rgba(239, 100, 97, 0.42);
-  background: rgba(239, 100, 97, 0.12);
+  border-color: rgba(var(--error-rgb), 0.42);
+  background: rgba(var(--error-rgb), 0.12);
 }
 
 .bd-status-recovered {
   color: var(--success);
-  border-color: rgba(66, 211, 146, 0.38);
+  border-color: rgba(var(--success-rgb), 0.38);
   background: var(--success-soft);
 }
 
@@ -682,4 +682,85 @@
 }
 @media (max-width: 360px) {
   .bd-page .mnh-stats-grid { grid-template-columns: 1fr; }
+}
+
+/* Sticky section menu below the site header. The sections stay on one page; the menu jumps to them. */
+.bd-section-nav {
+  position: sticky;
+  top: var(--bd-header-h, 0px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: var(--bd-nav-h, 48px);
+  margin-bottom: 0.25rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg);
+  scrollbar-width: none;
+}
+
+.bd-section-nav a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 0.85rem;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.bd-section-nav a:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.bd-section-nav a:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: -2px;
+}
+
+/* A jump, or the ban evidence panel taking focus, lands below the site header and the section menu. */
+.bd-section,
+.bd-page .banned-by-panel {
+  scroll-margin-top: calc(var(--bd-header-h, 0px) + var(--bd-nav-h, 48px) + 12px);
+}
+
+.bd-node-panel .pagination {
+  margin-top: 1rem;
+}
+
+/* Wide screens: no inner scroll box, so the column names stick below the section menu. Without it
+   the table must fit, so its cells wrap (a long service address anywhere). Narrower screens keep
+   the sideways-scrolling table, whose header cannot stick to the page. */
+@media (min-width: 1081px) {
+  .bd-node-panel .mnh-table-wrap {
+    overflow: visible;
+  }
+
+  .bd-node-panel .mnh-table th,
+  .bd-node-panel .mnh-table td {
+    white-space: normal;
+  }
+
+  .bd-node-panel .mnh-table td.mnh-mono {
+    overflow-wrap: anywhere;
+  }
+
+  .bd-node-panel .bd-ban-evidence {
+    white-space: nowrap;
+  }
+
+  .bd-node-panel .mnh-table thead th {
+    position: sticky;
+    top: calc(var(--bd-header-h, 0px) + var(--bd-nav-h, 48px));
+    z-index: 2;
+    background: var(--surface);
+    /* With collapsed borders the cell's own bottom border does not stick with it. */
+    box-shadow: inset 0 -1px 0 var(--border-soft);
+  }
 }
